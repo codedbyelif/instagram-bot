@@ -12,7 +12,7 @@ const checkTime = process.env.CHECK_TIME || '21:00';
 const usersFile = path.join(__dirname, 'users.json');
 
 if (!token) {
-    console.error('Hata: TELEGRAM_BOT_TOKEN config.env dosyasında tanımlanmamış.');
+    console.error('Hata: TELEGRAM_BOT_TOKEN config.env dosyasinda tanimlanmamis.');
     process.exit(1);
 }
 
@@ -28,8 +28,6 @@ try {
     if (fs.existsSync(usersFile)) {
         const data = fs.readFileSync(usersFile, 'utf8');
         const rawUsers = JSON.parse(data);
-
-        // Migration: Remove directThreadUrl if exists
         users = rawUsers.map(u => ({
             username: u.username,
             status: u.status || 'pending',
@@ -39,14 +37,14 @@ try {
         fs.writeFileSync(usersFile, '[]', 'utf8');
     }
 } catch (err) {
-    console.error('users.json yüklenirken hata:', err);
+    console.error('users.json yuklenirken hata:', err);
     users = [];
 }
 
 function saveUsers() {
     try {
         fs.writeFileSync(usersFile, JSON.stringify(users, null, 2), 'utf8');
-        console.log(`[SAVE] ${users.length} kullanıcı kaydedildi.`);
+        console.log('[SAVE] ' + users.length + ' kullanici kaydedildi.');
     } catch (err) {
         console.error('users.json kaydedilirken hata:', err);
     }
@@ -54,177 +52,143 @@ function saveUsers() {
 
 // --- Bot Commands ---
 
-// /start
 bot.onText(/\/start/, (msg) => {
-    const welcomeMsg = `╔═══════════════════════╗
-║  💖 INSTAGRAM BOT 💖  ║
-╚═══════════════════════╝
-
-✨ Komutlar:
-━━━━━━━━━━━━━━━━━━━━━
-➕ /adduser <kullanıcı_adı>
-   → Listeye kullanıcı ekle
-
-🔍 /check <kullanıcı_adı>
-   → Anlık kontrol (5dk cooldown)
-
-📋 /listusers
-   → Tüm kullanıcıları listele
-
-🗑️ /clearusers
-   → Listeyi temizle
-
-━━━━━━━━━━━━━━━━━━━━━
-⚙️ Arka Plan: Her 30dk'da 1 kullanıcı
-📊 Günlük Rapor: 21:00
-
-💡 Örnek Kullanım:
-/adduser riseinweb3
-/check cristiano
-
-━━━━━━━━━━━━━━━━━━━━━
-💕 Developed by @codedbyelif`;
-
-    bot.sendMessage(msg.chat.id, welcomeMsg);
+    const lines = [
+        '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557',
+        '\u2551  \uD83D\uDC96 INSTAGRAM BOT \uD83D\uDC96  \u2551',
+        '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D',
+        '',
+        '\u2728 Komutlar:',
+        '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501',
+        '\u2795 /adduser kullanici_adi',
+        '   \u2192 Listeye kullanici ekle',
+        '',
+        '\uD83D\uDD0D /check kullanici_adi',
+        '   \u2192 Anlik kontrol (5dk cooldown)',
+        '',
+        '\uD83D\uDCCB /listusers',
+        '   \u2192 Tum kullanicilari listele',
+        '',
+        '\uD83D\uDDD1\uFE0F /clearusers',
+        '   \u2192 Listeyi temizle',
+        '',
+        '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501',
+        '\u2699\uFE0F Arka Plan: Her 30dk\'da 1 kullanici',
+        '\uD83D\uDCCA Gunluk Rapor: 21:00',
+        '',
+        '\uD83D\uDCA1 Ornek Kullanim:',
+        '/adduser riseinweb3',
+        '/check cristiano',
+        '',
+        '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501',
+        '\uD83D\uDC95 Developed by @codedbyelif'
+    ];
+    bot.sendMessage(msg.chat.id, lines.join('\n'));
 });
 
-// /adduser <username>
 bot.onText(/\/adduser (.+)/, (msg, match) => {
     const username = match[1].trim();
-
     if (!username) {
-        return bot.sendMessage(msg.chat.id, '❌ Kullanım: /adduser kullanıcı_adı');
+        return bot.sendMessage(msg.chat.id, '\u274C Kullanim: /adduser kullanici_adi');
     }
-
-    // Check if already exists
     if (users.some(u => u.username === username)) {
-        return bot.sendMessage(msg.chat.id, `⚠️ "${username}" zaten listede.`);
+        return bot.sendMessage(msg.chat.id, '\u26A0\uFE0F "' + username + '" zaten listede.');
     }
-
-    users.push({
-        username,
-        status: 'pending',
-        lastChecked: null
-    });
-
+    users.push({ username, status: 'pending', lastChecked: null });
     saveUsers();
-    bot.sendMessage(msg.chat.id, `✅ Eklendi!\n\n👤 Kullanıcı: ${username}\n📊 Toplam: ${users.length} kullanıcı`);
+    bot.sendMessage(msg.chat.id, '\u2705 Eklendi!\n\n\uD83D\uDC64 Kullanici: ' + username + '\n\uD83D\uDCCA Toplam: ' + users.length + ' kullanici');
 });
 
-// /listusers
 bot.onText(/\/listusers/, (msg) => {
     if (users.length === 0) {
-        return bot.sendMessage(msg.chat.id, '📭 Liste boş.');
+        return bot.sendMessage(msg.chat.id, '\uD83D\uDCED Liste bos.');
     }
-
-    const header = `╔═══════════════════════╗
-║   📋 KULLANICI LİSTESİ   ║
-╚═══════════════════════╝\n\n`;
-
-    const userList = users.map((u, i) => {
-        const statusIcon = {
-            'AKTIF': '✅',
-            'BANLI': '🚫',
-            'KISITLI': '⚠️',
-            'RATE_LIMIT': '⏸️',
-            'pending': '⏳',
-            'HATA': '❌',
-            'BELIRSIZ': '❔'
-        };
-        const icon = statusIcon[u.status] || '❓';
-        return `${i + 1}. ${icon} ${u.username}\n   └─ ${u.status}`;
-    }).join('\n\n');
-
-    const footer = `\n\n━━━━━━━━━━━━━━━━━━━━━\n📊 Toplam: ${users.length} kullanıcı`;
-
-    bot.sendMessage(msg.chat.id, header + userList + footer);
+    const statusIcon = {
+        'AKTIF': '\u2705', 'BANLI': '\uD83D\uDEAB', 'KISITLI': '\u26A0\uFE0F',
+        'RATE_LIMIT': '\u23F8\uFE0F', 'pending': '\u23F3', 'HATA': '\u274C', 'BELIRSIZ': '\u2754'
+    };
+    let msg_text = '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n';
+    msg_text += '\u2551   \uD83D\uDCCB KULLANICI LISTESI   \u2551\n';
+    msg_text += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
+    users.forEach((u, i) => {
+        const icon = statusIcon[u.status] || '\u2753';
+        msg_text += (i + 1) + '. ' + icon + ' ' + u.username + '\n   \u2514\u2500 ' + u.status + '\n\n';
+    });
+    msg_text += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\uD83D\uDCCA Toplam: ' + users.length + ' kullanici';
+    bot.sendMessage(msg.chat.id, msg_text);
 });
 
-// /clearusers
 bot.onText(/\/clearusers/, (msg) => {
     users = [];
     saveUsers();
-    bot.sendMessage(msg.chat.id, '🗑️ Liste temizlendi.');
+    bot.sendMessage(msg.chat.id, '\uD83D\uDDD1\uFE0F Liste temizlendi.');
 });
 
-// /check <username> - Instant single user check with 5-minute cooldown
+// /check <username> - Instant single user check (NO RETRY - instant result)
 bot.onText(/\/check (.+)/, async (msg, match) => {
     const username = match[1].trim();
     const userId = msg.from.id;
-
     if (!username) {
-        return bot.sendMessage(msg.chat.id, '❌ Kullanım: /check kullanıcı_adı');
+        return bot.sendMessage(msg.chat.id, '\u274C Kullanim: /check kullanici_adi');
     }
 
-    // Check cooldown (5 minutes)
+    // 5 minute cooldown
     const now = Date.now();
-    const cooldownTime = 5 * 60 * 1000; // 5 minutes
+    const cooldownTime = 5 * 60 * 1000;
     const lastCheck = checkCooldowns.get(userId);
-
     if (lastCheck && (now - lastCheck) < cooldownTime) {
-        const remainingTime = Math.ceil((cooldownTime - (now - lastCheck)) / 1000 / 60);
-        return bot.sendMessage(msg.chat.id, `⏳ Cooldown Aktif\n\n⏱️ Lütfen ${remainingTime} dakika bekleyin.`);
+        const remaining = Math.ceil((cooldownTime - (now - lastCheck)) / 1000 / 60);
+        return bot.sendMessage(msg.chat.id, '\u23F3 Cooldown Aktif\n\n\u23F1\uFE0F Lutfen ' + remaining + ' dakika bekleyin.');
     }
 
-    bot.sendMessage(msg.chat.id, `🔍 Kontrol Ediliyor...\n\n👤 ${username}`);
+    bot.sendMessage(msg.chat.id, '\uD83D\uDD0D Kontrol Ediliyor...\n\n\uD83D\uDC64 ' + username);
 
-    const result = await checkInstagramUser(username);
+    // NO RETRY for instant check - get result immediately
+    const result = await checkInstagramUser(username, 0, false);
 
-    // Update cooldown
     checkCooldowns.set(userId, now);
 
     // Update in list if exists
-    const index = users.findIndex(u => u.username === username);
-    if (index !== -1) {
-        users[index].status = result.status;
-        users[index].lastChecked = new Date().toISOString();
+    const idx = users.findIndex(u => u.username === username);
+    if (idx !== -1) {
+        users[idx].status = result.status;
+        users[idx].lastChecked = new Date().toISOString();
         saveUsers();
     }
 
-    // Send result with enhanced formatting
     const statusEmoji = {
-        'AKTIF': '✅',
-        'BANLI': '🚫',
-        'KISITLI': '⚠️',
-        'RATE_LIMIT': '⏸️',
-        'HATA': '❌',
-        'BELIRSIZ': '❔'
+        'AKTIF': '\u2705', 'BANLI': '\uD83D\uDEAB', 'KISITLI': '\u26A0\uFE0F',
+        'RATE_LIMIT': '\u23F8\uFE0F', 'HATA': '\u274C', 'BELIRSIZ': '\u2754'
     };
+    const emoji = statusEmoji[result.status] || '\u2753';
+    const timeStr = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
 
-    const emoji = statusEmoji[result.status] || '❓';
-    const resultMsg = `╔═══════════════════════╗
-║     📊 KONTROL SONUCU     ║
-╚═══════════════════════╝
-
-👤 Kullanıcı: ${username}
-${emoji} Durum: ${result.status}
-
-📝 Açıklama:
-${result.description}
-
-━━━━━━━━━━━━━━━━━━━━━
-🕐 ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}`;
+    let resultMsg = '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n';
+    resultMsg += '\u2551     \uD83D\uDCCA KONTROL SONUCU     \u2551\n';
+    resultMsg += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
+    resultMsg += '\uD83D\uDC64 Kullanici: ' + username + '\n';
+    resultMsg += emoji + ' Durum: ' + result.status + '\n\n';
+    resultMsg += '\uD83D\uDCDD Aciklama:\n' + result.description + '\n\n';
+    resultMsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
+    resultMsg += '\uD83D\uDD50 ' + timeStr;
 
     bot.sendMessage(msg.chat.id, resultMsg);
 });
 
-// /checknow - Disabled (use /check instead)
 bot.onText(/\/checknow/, (msg) => {
-    bot.sendMessage(msg.chat.id, '⚠️ Bu komut artık kullanılmıyor.\n\nAnlık kontrol için: /check kullanıcı_adı\nÖrnek: /check instagram');
+    bot.sendMessage(msg.chat.id, '\u26A0\uFE0F Bu komut artik kullanilmiyor.\n\nAnlik kontrol icin: /check kullanici_adi\nOrnek: /check instagram');
 });
 
 // --- Core Logic ---
 
 async function runBackgroundBatch() {
     try {
-        console.log('[BACKGROUND] Arka plan kontrolü başladı...');
-
+        console.log('[BACKGROUND] Arka plan kontrolu basladi...');
         if (users.length === 0) {
-            console.log('[BACKGROUND] Kullanıcı listesi boş.');
+            console.log('[BACKGROUND] Kullanici listesi bos.');
             return;
         }
 
-        // Find next user to check (round-robin)
         const sortedUsers = [...users].sort((a, b) => {
             const aTime = a.lastChecked ? new Date(a.lastChecked).getTime() : 0;
             const bTime = b.lastChecked ? new Date(b.lastChecked).getTime() : 0;
@@ -232,10 +196,10 @@ async function runBackgroundBatch() {
         });
 
         const userToCheck = sortedUsers[0];
+        console.log('[BACKGROUND] Kontrol ediliyor: ' + userToCheck.username);
 
-        console.log(`[BACKGROUND] Kontrol ediliyor: ${userToCheck.username}`);
-
-        const result = await checkInstagramUser(userToCheck.username);
+        // Background checks DO have retry enabled
+        const result = await checkInstagramUser(userToCheck.username, 0, true);
 
         const index = users.findIndex(u => u.username === userToCheck.username);
         if (index !== -1) {
@@ -243,24 +207,35 @@ async function runBackgroundBatch() {
             users[index].lastChecked = new Date().toISOString();
         }
 
-        console.log(`[BACKGROUND] ${userToCheck.username}: ${result.status} - ${result.description}`);
-
+        console.log('[BACKGROUND] ' + userToCheck.username + ': ' + result.status + ' - ' + result.description);
         saveUsers();
 
-        // Alert if issue found
-        if ((result.status === 'BANLI' || result.status === 'KISITLI') && chatId) {
-            const alertMsg = `⚠️ UYARI!\n\n👤 ${userToCheck.username}\n🚫 Durum: ${result.status}\n\n📝 ${result.description}`;
-            bot.sendMessage(chatId, alertMsg).catch(err => console.error('[ALERT ERROR]', err));
+        // Notify for every check
+        if (chatId) {
+            const statusEmoji = {
+                'AKTIF': '\u2705', 'BANLI': '\uD83D\uDEAB', 'KISITLI': '\u26A0\uFE0F',
+                'RATE_LIMIT': '\u23F8\uFE0F', 'HATA': '\u274C', 'BELIRSIZ': '\u2754'
+            };
+            const emoji = statusEmoji[result.status] || '\u2753';
+            const timeStr = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
+
+            let notifMsg = '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n';
+            notifMsg += '\u2551  \uD83D\uDD04 ARKA PLAN KONTROL  \u2551\n';
+            notifMsg += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
+            notifMsg += '\uD83D\uDC64 Kullanici: ' + userToCheck.username + '\n';
+            notifMsg += emoji + ' Durum: ' + result.status + '\n\n';
+            notifMsg += '\uD83D\uDCDD ' + result.description + '\n\n';
+            notifMsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
+            notifMsg += '\uD83D\uDD50 ' + timeStr;
+
+            bot.sendMessage(chatId, notifMsg).catch(err => console.error('[NOTIFICATION ERROR]', err));
         }
 
-        console.log('[BACKGROUND] Kontrol tamamlandı.');
-
+        console.log('[BACKGROUND] Kontrol tamamlandi.');
     } catch (error) {
         console.error('[BACKGROUND ERROR]', error);
-
-        // Send error notification to user
         if (chatId) {
-            const errorMsg = `❌ ARKA PLAN HATASI\n\n🔧 Arka plan kontrolü sırasında hata oluştu.\n\n📝 Hata: ${error.message}\n\n⚠️ Telegram botu çalışmaya devam ediyor.\n30 dakika sonra tekrar denenecek.`;
+            const errorMsg = '\u274C ARKA PLAN HATASI\n\n\uD83D\uDD27 Hata: ' + error.message + '\n\n\u26A0\uFE0F Bot calismaya devam ediyor.\n30 dakika sonra tekrar denenecek.';
             bot.sendMessage(chatId, errorMsg).catch(err => console.error('[NOTIFICATION ERROR]', err));
         }
     }
@@ -269,7 +244,7 @@ async function runBackgroundBatch() {
 function sendReport(targetChatId = chatId) {
     try {
         if (!users.length) return;
-        if (!targetChatId) return console.log('[REPORT] CHAT_ID tanımlı değil.');
+        if (!targetChatId) return console.log('[REPORT] CHAT_ID tanimli degil.');
 
         const aktif = users.filter(u => u.status === 'AKTIF');
         const banli = users.filter(u => u.status === 'BANLI');
@@ -279,22 +254,22 @@ function sendReport(targetChatId = chatId) {
         const hata = users.filter(u => u.status === 'HATA');
         const belirsiz = users.filter(u => u.status === 'BELIRSIZ');
 
-        let message = `╔═══════════════════════╗
-║   💝 GÜNLÜK RAPOR 💝   ║
-╚═══════════════════════╝\n\n`;
+        let message = '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n';
+        message += '\u2551   \uD83D\uDC9D GUNLUK RAPOR \uD83D\uDC9D   \u2551\n';
+        message += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
 
-        if (aktif.length) message += `✅ Aktif (${aktif.length}):\n${aktif.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-        if (banli.length) message += `🚫 Banlı/Silinmiş (${banli.length}):\n${banli.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-        if (kisitli.length) message += `⚠️ Kısıtlı (${kisitli.length}):\n${kisitli.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-        if (rateLimit.length) message += `⏸️ Rate Limit (${rateLimit.length}):\n${rateLimit.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-        if (belirsiz.length) message += `❔ Belirsiz (${belirsiz.length}):\n${belirsiz.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-        if (bekleyen.length) message += `⏳ Bekleyen (${bekleyen.length}):\n${bekleyen.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-        if (hata.length) message += `❌ Hata (${hata.length}):\n${hata.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+        if (aktif.length) message += '\u2705 Aktif (' + aktif.length + '):\n' + aktif.map(u => '  \u2022 ' + u.username).join('\n') + '\n\n';
+        if (banli.length) message += '\uD83D\uDEAB Banli/Silinmis (' + banli.length + '):\n' + banli.map(u => '  \u2022 ' + u.username).join('\n') + '\n\n';
+        if (kisitli.length) message += '\u26A0\uFE0F Kisitli (' + kisitli.length + '):\n' + kisitli.map(u => '  \u2022 ' + u.username).join('\n') + '\n\n';
+        if (rateLimit.length) message += '\u23F8\uFE0F Rate Limit (' + rateLimit.length + '):\n' + rateLimit.map(u => '  \u2022 ' + u.username).join('\n') + '\n\n';
+        if (belirsiz.length) message += '\u2754 Belirsiz (' + belirsiz.length + '):\n' + belirsiz.map(u => '  \u2022 ' + u.username).join('\n') + '\n\n';
+        if (bekleyen.length) message += '\u23F3 Bekleyen (' + bekleyen.length + '):\n' + bekleyen.map(u => '  \u2022 ' + u.username).join('\n') + '\n\n';
+        if (hata.length) message += '\u274C Hata (' + hata.length + '):\n' + hata.map(u => '  \u2022 ' + u.username).join('\n') + '\n\n';
 
-        message += `━━━━━━━━━━━━━━━━━━━━━\n🕐 ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}\n💕 @codedbyelif`;
+        const timeStr = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
+        message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\uD83D\uDD50 ' + timeStr + '\n\uD83D\uDC95 @codedbyelif';
 
         bot.sendMessage(targetChatId, message).catch(err => console.error('[REPORT ERROR]', err));
-
     } catch (error) {
         console.error('[REPORT GENERATION ERROR]', error);
     }
@@ -304,4 +279,4 @@ function sendReport(targetChatId = chatId) {
 scheduleDistributedChecks(runBackgroundBatch);
 scheduleDailyReport(checkTime, sendReport);
 
-console.log(`✅ Bot çalışıyor... Günlük rapor: ${checkTime} (Türkiye saati)`);
+console.log('[BOT] Bot calisiyor... Gunluk rapor: ' + checkTime + ' (Turkiye saati)');
