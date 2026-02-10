@@ -19,6 +19,9 @@ if (!token) {
 // Initialize Bot
 const bot = new TelegramBot(token, { polling: true });
 
+// Cooldown tracking for /check command (5 minutes per user)
+const checkCooldowns = new Map();
+
 // Load Users
 let users = [];
 try {
