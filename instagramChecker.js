@@ -70,22 +70,19 @@ async function checkInstagramUser(username) {
         // Check if username appears in JSON data
         const hasUsernameInJSON = html.includes(`"username":"${username}"`);
 
-        // Detection logic:
-        // Active account: Has username in title, has OG tags, has username in JSON
-        // Inactive/Deleted: Generic "Instagram" title, no OG tags, no username in JSON
+        // Check for OG meta tags (reliable indicator of active account)
+        const hasOGData = !!(ogTitle && ogDescription);
 
-        const isGenericTitle = title.trim() === 'Instagram' || title.includes('Login');
-        const hasOGData = ogTitle && ogDescription;
-
-        if (isGenericTitle && !hasOGData && !hasUsernameInJSON) {
+        // POSITIVE INDICATORS: If account has OG data OR username in JSON, it's active
+        if (hasOGData || hasUsernameInJSON) {
             return {
                 username,
-                status: 'BANLI',
-                description: 'Hesap bulunamadı veya silinmiş'
+                status: 'AKTIF',
+                description: 'Hesap aktif ve erişilebilir'
             };
         }
 
-        // Check for explicit error messages
+        // NEGATIVE INDICATORS: Check for explicit error messages
         if (html.includes("Sorry, this page isn't available") ||
             html.includes("Sayfa Bulunamadı") ||
             html.includes("Page Not Found")) {
@@ -105,20 +102,21 @@ async function checkInstagramUser(username) {
             };
         }
 
-        // If we have username in JSON and proper meta tags, account is active
-        if (hasUsernameInJSON || hasOGData) {
+        // If title is generic "Instagram" and no positive indicators, likely deleted
+        const isGenericTitle = title.trim() === 'Instagram' || title.includes('Login');
+        if (isGenericTitle) {
             return {
                 username,
-                status: 'AKTIF',
-                description: 'Hesap aktif ve erişilebilir'
+                status: 'BANLI',
+                description: 'Hesap bulunamadı veya silinmiş'
             };
         }
 
-        // Fallback: If we can't determine, mark as uncertain
+        // Fallback: uncertain
         return {
             username,
             status: 'BELIRSIZ',
-            description: 'Durum belirlenemedi, manuel kontrol gerekebilir'
+            description: 'Durum belirlenemedi'
         };
 
     } catch (error) {
