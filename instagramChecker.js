@@ -10,11 +10,12 @@ const USER_AGENTS = [
 ];
 
 /**
- * Checks Instagram user profile with rate limit handling
+ * Checks Instagram user profile with smart retry on rate limits
  * @param {string} username - Instagram username to check
+ * @param {number} retryCount - Current retry attempt (for exponential backoff)
  * @returns {Promise<Object>} Check result with status and description
  */
-async function checkInstagramUser(username) {
+async function checkInstagramUser(username, retryCount = 0) {
     const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
     const profileUrl = `https://www.instagram.com/${username}/`;
 
@@ -43,15 +44,25 @@ async function checkInstagramUser(username) {
             return {
                 username,
                 status: 'BANLI',
-                description: 'Hesap bulunamadı (404)'
+                description: 'Hesap bulunamadı (404)',
+                retryCount
             };
         }
 
         if (response.status === 403 || response.status === 429) {
+            // Rate limit detected - retry with exponential backoff
+            if (retryCount < 3) {
+                const waitTime = Math.pow(2, retryCount) * 60 * 1000; // 1min, 2min, 4min
+                console.log(`[RETRY] ${username} - Rate limit, waiting ${waitTime / 1000 / 60} minutes...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                return checkInstagramUser(username, retryCount + 1);
+            }
+
             return {
                 username,
                 status: 'RATE_LIMIT',
-                description: 'Instagram rate limit - daha sonra tekrar denenecek'
+                description: `Rate limit - ${retryCount} deneme sonrası başarısız`,
+                retryCount
             };
         }
 
@@ -59,7 +70,8 @@ async function checkInstagramUser(username) {
             return {
                 username,
                 status: 'HATA',
-                description: `HTTP ${response.status}`
+                description: `HTTP ${response.status}`,
+                retryCount
             };
         }
 
@@ -73,14 +85,21 @@ async function checkInstagramUser(username) {
         const hasUsernameInJSON = html.includes(`"username":"${username}"`);
         const hasOGData = !!(ogTitle && ogDescription);
 
-        // If we got rate limited (generic Instagram page), mark as uncertain
+        // If we got rate limited (generic Instagram page), retry
         const isGenericTitle = title.trim() === 'Instagram' || title.includes('Login');
         if (isGenericTitle && !hasOGData && !hasUsernameInJSON) {
-            // This is likely rate limiting, not a deleted account
+            if (retryCount < 3) {
+                const waitTime = Math.pow(2, retryCount) * 60 * 1000;
+                console.log(`[RETRY] ${username} - Generic page, waiting ${waitTime / 1000 / 60} minutes...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                return checkInstagramUser(username, retryCount + 1);
+            }
+
             return {
                 username,
                 status: 'RATE_LIMIT',
-                description: 'Instagram rate limit algılandı - durum belirsiz'
+                description: `Rate limit algılandı - ${retryCount} deneme sonrası`,
+                retryCount
             };
         }
 
@@ -89,7 +108,8 @@ async function checkInstagramUser(username) {
             return {
                 username,
                 status: 'AKTIF',
-                description: 'Hesap aktif'
+                description: 'Hesap aktif',
+                retryCount
             };
         }
 
@@ -100,7 +120,8 @@ async function checkInstagramUser(username) {
             return {
                 username,
                 status: 'BANLI',
-                description: 'Hesap bulunamadı'
+                description: 'Hesap bulunamadı',
+                retryCount
             };
         }
 
@@ -109,7 +130,8 @@ async function checkInstagramUser(username) {
             return {
                 username,
                 status: 'KISITLI',
-                description: 'Profil kısıtlanmış'
+                description: 'Profil kısıtlanmış',
+                retryCount
             };
         }
 
@@ -117,22 +139,33 @@ async function checkInstagramUser(username) {
         return {
             username,
             status: 'BELIRSIZ',
-            description: 'Durum belirlenemedi'
+            description: 'Durum belirlenemedi',
+            retryCount
         };
 
     } catch (error) {
         if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+            // Timeout - retry
+            if (retryCount < 3) {
+                const waitTime = Math.pow(2, retryCount) * 60 * 1000;
+                console.log(`[RETRY] ${username} - Timeout, waiting ${waitTime / 1000 / 60} minutes...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                return checkInstagramUser(username, retryCount + 1);
+            }
+
             return {
                 username,
                 status: 'HATA',
-                description: 'Zaman aşımı'
+                description: 'Zaman aşımı',
+                retryCount
             };
         }
 
         return {
             username,
             status: 'HATA',
-            description: `Hata: ${error.message}`
+            description: `Hata: ${error.message}`,
+            retryCount
         };
     }
 }

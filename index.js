@@ -56,16 +56,34 @@ function saveUsers() {
 
 // /start
 bot.onText(/\/start/, (msg) => {
-    const welcomeMsg = `🤖 Instagram Kontrol Botu
+    const welcomeMsg = `╔═══════════════════════╗
+║  📱 INSTAGRAM BOT 📱  ║
+╚═══════════════════════╝
 
-Komutlar:
-/adduser kullanıcı_adı - Kullanıcı ekle
-/listusers - Listeyi gör
-/checknow - Şimdi kontrol et
-/clearusers - Listeyi temizle
+🎯 Komutlar:
+━━━━━━━━━━━━━━━━━━━━━
+➕ /adduser <kullanıcı_adı>
+   → Listeye kullanıcı ekle
 
-Örnek:
-/adduser riseinweb3`;
+🔍 /check <kullanıcı_adı>
+   → Anlık kontrol (5dk cooldown)
+
+📋 /listusers
+   → Tüm kullanıcıları listele
+
+🗑️ /clearusers
+   → Listeyi temizle
+
+━━━━━━━━━━━━━━━━━━━━━
+⚙️ Arka Plan: Her 30dk'da 1 kullanıcı
+📊 Günlük Rapor: 21:00
+
+💡 Örnek Kullanım:
+/adduser riseinweb3
+/check cristiano
+
+━━━━━━━━━━━━━━━━━━━━━
+👨‍💻 Developed by @codedbyelif`;
 
     bot.sendMessage(msg.chat.id, welcomeMsg);
 });
@@ -90,7 +108,7 @@ bot.onText(/\/adduser (.+)/, (msg, match) => {
     });
 
     saveUsers();
-    bot.sendMessage(msg.chat.id, `✅ "${username}" eklendi. Toplam: ${users.length}`);
+    bot.sendMessage(msg.chat.id, `✅ Eklendi!\n\n👤 Kullanıcı: ${username}\n📊 Toplam: ${users.length} kullanıcı`);
 });
 
 // /listusers
@@ -99,11 +117,27 @@ bot.onText(/\/listusers/, (msg) => {
         return bot.sendMessage(msg.chat.id, '📭 Liste boş.');
     }
 
-    const userList = users.map((u, i) =>
-        `${i + 1}. ${u.username} - ${u.status}`
-    ).join('\n');
+    const header = `╔═══════════════════════╗
+║   📋 KULLANICI LİSTESİ   ║
+╚═══════════════════════╝\n\n`;
 
-    bot.sendMessage(msg.chat.id, `📋 Kullanıcı Listesi (${users.length}):\n\n${userList}`);
+    const userList = users.map((u, i) => {
+        const statusIcon = {
+            'AKTIF': '✅',
+            'BANLI': '🚫',
+            'KISITLI': '⚠️',
+            'RATE_LIMIT': '⏸️',
+            'pending': '⏳',
+            'HATA': '❌',
+            'BELIRSIZ': '❔'
+        };
+        const icon = statusIcon[u.status] || '❓';
+        return `${i + 1}. ${icon} ${u.username}\n   └─ ${u.status}`;
+    }).join('\n\n');
+
+    const footer = `\n\n━━━━━━━━━━━━━━━━━━━━━\n📊 Toplam: ${users.length} kullanıcı`;
+
+    bot.sendMessage(msg.chat.id, header + userList + footer);
 });
 
 // /clearusers
@@ -113,17 +147,31 @@ bot.onText(/\/clearusers/, (msg) => {
     bot.sendMessage(msg.chat.id, '🗑️ Liste temizlendi.');
 });
 
-// /check <username> - Instant single user check
+// /check <username> - Instant single user check with 5-minute cooldown
 bot.onText(/\/check (.+)/, async (msg, match) => {
     const username = match[1].trim();
+    const userId = msg.from.id;
 
     if (!username) {
         return bot.sendMessage(msg.chat.id, '❌ Kullanım: /check kullanıcı_adı');
     }
 
-    bot.sendMessage(msg.chat.id, `🔍 ${username} kontrol ediliyor...`);
+    // Check cooldown (5 minutes)
+    const now = Date.now();
+    const cooldownTime = 5 * 60 * 1000; // 5 minutes
+    const lastCheck = checkCooldowns.get(userId);
+
+    if (lastCheck && (now - lastCheck) < cooldownTime) {
+        const remainingTime = Math.ceil((cooldownTime - (now - lastCheck)) / 1000 / 60);
+        return bot.sendMessage(msg.chat.id, `⏳ Cooldown Aktif\n\n⏱️ Lütfen ${remainingTime} dakika bekleyin.`);
+    }
+
+    bot.sendMessage(msg.chat.id, `🔍 Kontrol Ediliyor...\n\n👤 ${username}`);
 
     const result = await checkInstagramUser(username);
+
+    // Update cooldown
+    checkCooldowns.set(userId, now);
 
     // Update in list if exists
     const index = users.findIndex(u => u.username === username);
@@ -133,7 +181,7 @@ bot.onText(/\/check (.+)/, async (msg, match) => {
         saveUsers();
     }
 
-    // Send result
+    // Send result with enhanced formatting
     const statusEmoji = {
         'AKTIF': '✅',
         'BANLI': '🚫',
@@ -144,7 +192,20 @@ bot.onText(/\/check (.+)/, async (msg, match) => {
     };
 
     const emoji = statusEmoji[result.status] || '❓';
-    bot.sendMessage(msg.chat.id, `${emoji} ${username}: ${result.status}\n${result.description}`);
+    const resultMsg = `╔═══════════════════════╗
+║     📊 KONTROL SONUCU     ║
+╚═══════════════════════╝
+
+👤 Kullanıcı: ${username}
+${emoji} Durum: ${result.status}
+
+📝 Açıklama:
+${result.description}
+
+━━━━━━━━━━━━━━━━━━━━━
+🕐 ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}`;
+
+    bot.sendMessage(msg.chat.id, resultMsg);
 });
 
 // /checknow - Disabled (use /check instead)
@@ -188,7 +249,7 @@ async function runBackgroundBatch() {
 
     // Alert if issue found
     if ((result.status === 'BANLI' || result.status === 'KISITLI') && chatId) {
-        const alertMsg = `⚠️ Dikkat! ${userToCheck.username}: ${result.status}\n${result.description}`;
+        const alertMsg = `⚠️ UYARI!\n\n👤 ${userToCheck.username}\n🚫 Durum: ${result.status}\n\n📝 ${result.description}`;
         bot.sendMessage(chatId, alertMsg);
     }
 }
@@ -205,17 +266,19 @@ function sendReport(targetChatId = chatId) {
     const hata = users.filter(u => u.status === 'HATA');
     const belirsiz = users.filter(u => u.status === 'BELIRSIZ');
 
-    let message = `📊 Kontrol Raporu\n\n`;
+    let message = `╔═══════════════════════╗
+║   📊 GÜNLÜK RAPOR 📊   ║
+╚═══════════════════════╝\n\n`;
 
-    if (aktif.length) message += `✅ Aktif (${aktif.length}):\n${aktif.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (banli.length) message += `🚫 Banlı/Silinmiş (${banli.length}):\n${banli.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (kisitli.length) message += `⚠️ Kısıtlı (${kisitli.length}):\n${kisitli.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (rateLimit.length) message += `⏸️ Rate Limit (${rateLimit.length}):\n${rateLimit.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (belirsiz.length) message += `❔ Belirsiz (${belirsiz.length}):\n${belirsiz.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (bekleyen.length) message += `⏳ Bekleyen (${bekleyen.length}):\n${bekleyen.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (hata.length) message += `❓ Hata (${hata.length}):\n${hata.map(u => `- ${u.username}`).join('\n')}\n\n`;
+    if (aktif.length) message += `✅ Aktif (${aktif.length}):\n${aktif.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+    if (banli.length) message += `🚫 Banlı/Silinmiş (${banli.length}):\n${banli.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+    if (kisitli.length) message += `⚠️ Kısıtlı (${kisitli.length}):\n${kisitli.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+    if (rateLimit.length) message += `⏸️ Rate Limit (${rateLimit.length}):\n${rateLimit.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+    if (belirsiz.length) message += `❔ Belirsiz (${belirsiz.length}):\n${belirsiz.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+    if (bekleyen.length) message += `⏳ Bekleyen (${bekleyen.length}):\n${bekleyen.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+    if (hata.length) message += `❌ Hata (${hata.length}):\n${hata.map(u => `  • ${u.username}`).join('\n')}\n\n`;
 
-    message += `🕒 ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}`;
+    message += `━━━━━━━━━━━━━━━━━━━━━\n� ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}\n👨‍💻 @codedbyelif`;
 
     bot.sendMessage(targetChatId, message);
 }
