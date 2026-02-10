@@ -110,82 +110,82 @@ bot.onText(/\/clearusers/, (msg) => {
     bot.sendMessage(msg.chat.id, '🗑️ Liste temizlendi.');
 });
 
-// /checknow
-bot.onText(/\/checknow/, async (msg) => {
-    if (users.length === 0) {
-        return bot.sendMessage(msg.chat.id, '📭 Kontrol edilecek kullanıcı yok.');
+// /check <username> - Instant single user check
+bot.onText(/\/check (.+)/, async (msg, match) => {
+    const username = match[1].trim();
+
+    if (!username) {
+        return bot.sendMessage(msg.chat.id, '❌ Kullanım: /check kullanıcı_adı');
     }
 
-    bot.sendMessage(msg.chat.id, `🔍 ${users.length} kullanıcı kontrol ediliyor...`);
+    bot.sendMessage(msg.chat.id, `🔍 ${username} kontrol ediliyor...`);
 
-    for (const user of users) {
-        const result = await checkInstagramUser(user.username);
+    const result = await checkInstagramUser(username);
 
-        // Update user status
-        const index = users.findIndex(u => u.username === user.username);
-        if (index !== -1) {
-            users[index].status = result.status;
-            users[index].lastChecked = new Date().toISOString();
-        }
-
-        // Wait 5 seconds between checks (increased to avoid rate limiting)
-        await new Promise(r => setTimeout(r, 5000));
+    // Update in list if exists
+    const index = users.findIndex(u => u.username === username);
+    if (index !== -1) {
+        users[index].status = result.status;
+        users[index].lastChecked = new Date().toISOString();
+        saveUsers();
     }
 
-    saveUsers();
-    sendReport(msg.chat.id);
+    // Send result
+    const statusEmoji = {
+        'AKTIF': '✅',
+        'BANLI': '🚫',
+        'KISITLI': '⚠️',
+        'RATE_LIMIT': '⏸️',
+        'HATA': '❌',
+        'BELIRSIZ': '❔'
+    };
+
+    const emoji = statusEmoji[result.status] || '❓';
+    bot.sendMessage(msg.chat.id, `${emoji} ${username}: ${result.status}\n${result.description}`);
+});
+
+// /checknow - Disabled (use /check instead)
+bot.onText(/\/checknow/, (msg) => {
+    bot.sendMessage(msg.chat.id, '⚠️ Bu komut artık kullanılmıyor.\n\nAnlık kontrol için: /check kullanıcı_adı\nÖrnek: /check instagram');
 });
 
 // --- Core Logic ---
 
 async function runBackgroundBatch() {
-    console.log('[BATCH] Arka plan kontrolü başladı...');
+    console.log('[BACKGROUND] Arka plan kontrolü başladı...');
 
     if (users.length === 0) {
-        console.log('[BATCH] Kullanıcı listesi boş.');
+        console.log('[BACKGROUND] Kullanıcı listesi boş.');
         return;
     }
 
-    const today = new Date().toDateString();
-    const candidates = users.filter(u =>
-        !u.lastChecked || new Date(u.lastChecked).toDateString() !== today
-    );
+    // Find next user to check (round-robin)
+    // Sort by lastChecked (oldest first), then take the first one
+    const sortedUsers = [...users].sort((a, b) => {
+        const aTime = a.lastChecked ? new Date(a.lastChecked).getTime() : 0;
+        const bTime = b.lastChecked ? new Date(b.lastChecked).getTime() : 0;
+        return aTime - bTime;
+    });
 
-    if (candidates.length === 0) {
-        console.log('[BATCH] Bugün için tüm kullanıcılar kontrol edilmiş.');
-        return;
+    const userToCheck = sortedUsers[0];
+
+    console.log(`[BACKGROUND] Kontrol ediliyor: ${userToCheck.username}`);
+
+    const result = await checkInstagramUser(userToCheck.username);
+
+    const index = users.findIndex(u => u.username === userToCheck.username);
+    if (index !== -1) {
+        users[index].status = result.status;
+        users[index].lastChecked = new Date().toISOString();
     }
 
-    const batchSize = 5;
-    const batch = candidates.slice(0, batchSize);
-
-    console.log(`[BATCH] ${batch.length} kullanıcı kontrol edilecek.`);
-
-    for (const user of batch) {
-        const result = await checkInstagramUser(user.username);
-
-        const index = users.findIndex(u => u.username === user.username);
-        if (index !== -1) {
-            users[index].status = result.status;
-            users[index].lastChecked = new Date().toISOString();
-        }
-
-        console.log(`[BATCH] ${user.username}: ${result.status}`);
-
-        // Wait 5 seconds (increased to avoid rate limiting)
-        await new Promise(r => setTimeout(r, 5000));
-    }
+    console.log(`[BACKGROUND] ${userToCheck.username}: ${result.status} - ${result.description}`);
 
     saveUsers();
 
-    // Alert if issues found
-    const issues = batch.filter(u => {
-        const updated = users.find(dbUser => dbUser.username === u.username);
-        return updated && (updated.status === 'BANLI' || updated.status === 'KISITLI');
-    });
-
-    if (issues.length > 0 && chatId) {
-        const alertMsg = `⚠️ Dikkat! Sorunlu hesaplar tespit edildi:\n\n${issues.map(u => `- ${u.username}`).join('\n')}`;
+    // Alert if issue found
+    if ((result.status === 'BANLI' || result.status === 'KISITLI') && chatId) {
+        const alertMsg = `⚠️ Dikkat! ${userToCheck.username}: ${result.status}\n${result.description}`;
         bot.sendMessage(chatId, alertMsg);
     }
 }
