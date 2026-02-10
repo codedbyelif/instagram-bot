@@ -57,10 +57,10 @@ function saveUsers() {
 // /start
 bot.onText(/\/start/, (msg) => {
     const welcomeMsg = `╔═══════════════════════╗
-║  📱 INSTAGRAM BOT 📱  ║
+║  💖 INSTAGRAM BOT 💖  ║
 ╚═══════════════════════╝
 
-🎯 Komutlar:
+✨ Komutlar:
 ━━━━━━━━━━━━━━━━━━━━━
 ➕ /adduser <kullanıcı_adı>
    → Listeye kullanıcı ekle
@@ -83,7 +83,7 @@ bot.onText(/\/start/, (msg) => {
 /check cristiano
 
 ━━━━━━━━━━━━━━━━━━━━━
-👨‍💻 Developed by @codedbyelif`;
+💕 Developed by @codedbyelif`;
 
     bot.sendMessage(msg.chat.id, welcomeMsg);
 });
@@ -280,7 +280,7 @@ function sendReport(targetChatId = chatId) {
         const belirsiz = users.filter(u => u.status === 'BELIRSIZ');
 
         let message = `╔═══════════════════════╗
-║   📊 GÜNLÜK RAPOR 📊   ║
+║   💝 GÜNLÜK RAPOR 💝   ║
 ╚═══════════════════════╝\n\n`;
 
         if (aktif.length) message += `✅ Aktif (${aktif.length}):\n${aktif.map(u => `  • ${u.username}`).join('\n')}\n\n`;
@@ -291,7 +291,7 @@ function sendReport(targetChatId = chatId) {
         if (bekleyen.length) message += `⏳ Bekleyen (${bekleyen.length}):\n${bekleyen.map(u => `  • ${u.username}`).join('\n')}\n\n`;
         if (hata.length) message += `❌ Hata (${hata.length}):\n${hata.map(u => `  • ${u.username}`).join('\n')}\n\n`;
 
-        message += `━━━━━━━━━━━━━━━━━━━━━\n🕐 ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}\n👨‍💻 @codedbyelif`;
+        message += `━━━━━━━━━━━━━━━━━━━━━\n🕐 ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}\n💕 @codedbyelif`;
 
         bot.sendMessage(targetChatId, message).catch(err => console.error('[REPORT ERROR]', err));
 
