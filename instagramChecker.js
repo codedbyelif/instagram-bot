@@ -10,16 +10,16 @@ const USER_AGENTS = [
 ];
 
 /**
- * Checks Instagram user via direct thread URL
- * @param {string} username - Expected username
- * @param {string} directThreadUrl - Instagram direct thread URL
+ * Checks Instagram user profile
+ * @param {string} username - Instagram username to check
  * @returns {Promise<Object>} Check result with status and description
  */
-async function checkInstagramUser(username, directThreadUrl) {
+async function checkInstagramUser(username) {
     const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+    const profileUrl = `https://www.instagram.com/${username}/`;
 
     try {
-        const response = await axios.get(directThreadUrl, {
+        const response = await axios.get(profileUrl, {
             headers: {
                 'User-Agent': userAgent,
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -34,77 +34,71 @@ async function checkInstagramUser(username, directThreadUrl) {
         });
 
         // Check HTTP status
-        if (response.status === 404 || response.status === 410) {
+        if (response.status === 404) {
             return {
                 username,
-                url: directThreadUrl,
-                status: 'URL_GECERSIZ',
-                description: 'Thread URL geçersiz veya silinmiş (404/410)'
+                status: 'BANLI',
+                description: 'Hesap bulunamadı veya silinmiş'
             };
         }
 
         if (response.status === 403) {
             return {
                 username,
-                url: directThreadUrl,
-                status: 'ERISIM_KISITLI',
-                description: 'Instagram tarafından erişim kısıtlandı'
+                status: 'KISITLI',
+                description: 'Hesap kısıtlanmış veya erişim engellendi'
             };
         }
 
         if (response.status !== 200) {
             return {
                 username,
-                url: directThreadUrl,
-                status: 'URL_GECERSIZ',
+                status: 'HATA',
                 description: `Beklenmeyen HTTP durumu: ${response.status}`
             };
         }
 
-        // Parse HTML and check for username
+        // Parse HTML
         const html = response.data;
-        const finalUrl = response.request.res.responseUrl || directThreadUrl;
 
-        // Load HTML with cheerio
-        const $ = cheerio.load(html);
-        const pageTitle = $('title').text();
-        const bodyText = $('body').text();
-
-        // Check if username exists in various places
-        const usernameInUrl = finalUrl.toLowerCase().includes(username.toLowerCase());
-        const usernameInHtml = html.toLowerCase().includes(username.toLowerCase());
-        const usernameInTitle = pageTitle.toLowerCase().includes(username.toLowerCase());
-        const usernameInBody = bodyText.toLowerCase().includes(username.toLowerCase());
-
-        if (usernameInUrl || usernameInHtml || usernameInTitle || usernameInBody) {
+        // Check for common error messages
+        if (html.includes("Sorry, this page isn't available") ||
+            html.includes("Sayfa Bulunamadı") ||
+            html.includes("Page Not Found")) {
             return {
                 username,
-                url: directThreadUrl,
-                status: 'AKTIF',
-                description: 'Kullanıcı adı doğrulandı, hesap aktif'
-            };
-        } else {
-            return {
-                username,
-                url: directThreadUrl,
-                status: 'KULLANICI_ADI_DEGISMIS',
-                description: 'Kullanıcı adı bulunamadı, hesap kapatılmış veya kullanıcı adı değişmiş olabilir'
+                status: 'BANLI',
+                description: 'Hesap bulunamadı (soft 404)'
             };
         }
+
+        if (html.includes("Restricted profile") ||
+            html.includes("Kısıtlanmış profil")) {
+            return {
+                username,
+                status: 'KISITLI',
+                description: 'Profil kısıtlanmış'
+            };
+        }
+
+        // If we got here with 200 and no error messages, account is active
+        return {
+            username,
+            status: 'AKTIF',
+            description: 'Hesap aktif ve erişilebilir'
+        };
 
     } catch (error) {
         if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
             return {
                 username,
-                url: directThreadUrl,
-                status: 'ERISIM_KISITLI',
+                status: 'HATA',
                 description: 'Bağlantı zaman aşımına uğradı'
             };
         }
 
         return {
             username,
-            url: directThreadUrl,
             status: 'HATA',
             description: `Kontrol hatası: ${error.message}`
         };

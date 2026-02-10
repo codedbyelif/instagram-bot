@@ -24,7 +24,14 @@ let users = [];
 try {
     if (fs.existsSync(usersFile)) {
         const data = fs.readFileSync(usersFile, 'utf8');
-        users = JSON.parse(data);
+        const rawUsers = JSON.parse(data);
+
+        // Migration: Remove directThreadUrl if exists
+        users = rawUsers.map(u => ({
+            username: u.username,
+            status: u.status || 'pending',
+            lastChecked: u.lastChecked || null
+        }));
     } else {
         fs.writeFileSync(usersFile, '[]', 'utf8');
     }
@@ -49,27 +56,24 @@ bot.onText(/\/start/, (msg) => {
     const welcomeMsg = `🤖 Instagram Kontrol Botu
 
 Komutlar:
-/adduser kullanıcı_adı thread_url - Kullanıcı ekle
+/adduser kullanıcı_adı - Kullanıcı ekle
 /listusers - Listeyi gör
 /checknow - Şimdi kontrol et
 /clearusers - Listeyi temizle
 
 Örnek:
-/adduser riseinweb3 https://www.instagram.com/direct/t/123456/`;
+/adduser riseinweb3`;
 
     bot.sendMessage(msg.chat.id, welcomeMsg);
 });
 
-// /adduser <username> <url>
+// /adduser <username>
 bot.onText(/\/adduser (.+)/, (msg, match) => {
-    const input = match[1].trim().split(' ');
+    const username = match[1].trim();
 
-    if (input.length < 2) {
-        return bot.sendMessage(msg.chat.id, '❌ Kullanım: /adduser <username> <thread_url>');
+    if (!username) {
+        return bot.sendMessage(msg.chat.id, '❌ Kullanım: /adduser kullanıcı_adı');
     }
-
-    const username = input[0];
-    const directThreadUrl = input[1];
 
     // Check if already exists
     if (users.some(u => u.username === username)) {
@@ -78,7 +82,6 @@ bot.onText(/\/adduser (.+)/, (msg, match) => {
 
     users.push({
         username,
-        directThreadUrl,
         status: 'pending',
         lastChecked: null
     });
@@ -97,9 +100,7 @@ bot.onText(/\/listusers/, (msg) => {
         `${i + 1}. ${u.username} - ${u.status}`
     ).join('\n');
 
-    bot.sendMessage(msg.chat.id, `📋 *Kullanıcı Listesi (${users.length}):*\n\n${userList}`, {
-        parse_mode: 'Markdown'
-    });
+    bot.sendMessage(msg.chat.id, `📋 Kullanıcı Listesi (${users.length}):\n\n${userList}`);
 });
 
 // /clearusers
@@ -118,7 +119,7 @@ bot.onText(/\/checknow/, async (msg) => {
     bot.sendMessage(msg.chat.id, `🔍 ${users.length} kullanıcı kontrol ediliyor...`);
 
     for (const user of users) {
-        const result = await checkInstagramUser(user.username, user.directThreadUrl);
+        const result = await checkInstagramUser(user.username);
 
         // Update user status
         const index = users.findIndex(u => u.username === user.username);
@@ -161,7 +162,7 @@ async function runBackgroundBatch() {
     console.log(`[BATCH] ${batch.length} kullanıcı kontrol edilecek.`);
 
     for (const user of batch) {
-        const result = await checkInstagramUser(user.username, user.directThreadUrl);
+        const result = await checkInstagramUser(user.username);
 
         const index = users.findIndex(u => u.username === user.username);
         if (index !== -1) {
@@ -180,12 +181,12 @@ async function runBackgroundBatch() {
     // Alert if issues found
     const issues = batch.filter(u => {
         const updated = users.find(dbUser => dbUser.username === u.username);
-        return updated && (updated.status === 'KULLANICI_ADI_DEGISMIS' || updated.status === 'URL_GECERSIZ');
+        return updated && (updated.status === 'BANLI' || updated.status === 'KISITLI');
     });
 
     if (issues.length > 0 && chatId) {
-        const alertMsg = `⚠️ *Dikkat!* Sorunlu hesaplar tespit edildi:\n\n${issues.map(u => `- ${u.username}`).join('\n')}`;
-        bot.sendMessage(chatId, alertMsg, { parse_mode: 'Markdown' });
+        const alertMsg = `⚠️ Dikkat! Sorunlu hesaplar tespit edildi:\n\n${issues.map(u => `- ${u.username}`).join('\n')}`;
+        bot.sendMessage(chatId, alertMsg);
     }
 }
 
@@ -194,24 +195,22 @@ function sendReport(targetChatId = chatId) {
     if (!targetChatId) return console.log('[REPORT] CHAT_ID tanımlı değil.');
 
     const aktif = users.filter(u => u.status === 'AKTIF');
-    const degismis = users.filter(u => u.status === 'KULLANICI_ADI_DEGISMIS');
-    const gecersiz = users.filter(u => u.status === 'URL_GECERSIZ');
-    const kisitli = users.filter(u => u.status === 'ERISIM_KISITLI');
+    const banli = users.filter(u => u.status === 'BANLI');
+    const kisitli = users.filter(u => u.status === 'KISITLI');
     const bekleyen = users.filter(u => u.status === 'pending');
     const hata = users.filter(u => u.status === 'HATA');
 
-    let message = `📊 *Kontrol Raporu*\n\n`;
+    let message = `📊 Kontrol Raporu\n\n`;
 
-    if (aktif.length) message += `✅ *Aktif (${aktif.length}):*\n${aktif.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (degismis.length) message += `⚠️ *Kullanıcı Adı Değişmiş (${degismis.length}):*\n${degismis.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (gecersiz.length) message += `❌ *URL Geçersiz (${gecersiz.length}):*\n${gecersiz.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (kisitli.length) message += `🚫 *Erişim Kısıtlı (${kisitli.length}):*\n${kisitli.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (bekleyen.length) message += `⏳ *Bekleyen (${bekleyen.length}):*\n${bekleyen.map(u => `- ${u.username}`).join('\n')}\n\n`;
-    if (hata.length) message += `❓ *Hata (${hata.length}):*\n${hata.map(u => `- ${u.username}`).join('\n')}\n\n`;
+    if (aktif.length) message += `✅ Aktif (${aktif.length}):\n${aktif.map(u => `- ${u.username}`).join('\n')}\n\n`;
+    if (banli.length) message += `🚫 Banlı/Silinmiş (${banli.length}):\n${banli.map(u => `- ${u.username}`).join('\n')}\n\n`;
+    if (kisitli.length) message += `⚠️ Kısıtlı (${kisitli.length}):\n${kisitli.map(u => `- ${u.username}`).join('\n')}\n\n`;
+    if (bekleyen.length) message += `⏳ Bekleyen (${bekleyen.length}):\n${bekleyen.map(u => `- ${u.username}`).join('\n')}\n\n`;
+    if (hata.length) message += `❓ Hata (${hata.length}):\n${hata.map(u => `- ${u.username}`).join('\n')}\n\n`;
 
     message += `🕒 ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}`;
 
-    bot.sendMessage(targetChatId, message, { parse_mode: 'Markdown' });
+    bot.sendMessage(targetChatId, message);
 }
 
 // Start Schedulers
