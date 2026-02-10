@@ -216,71 +216,88 @@ bot.onText(/\/checknow/, (msg) => {
 // --- Core Logic ---
 
 async function runBackgroundBatch() {
-    console.log('[BACKGROUND] Arka plan kontrolü başladı...');
+    try {
+        console.log('[BACKGROUND] Arka plan kontrolü başladı...');
 
-    if (users.length === 0) {
-        console.log('[BACKGROUND] Kullanıcı listesi boş.');
-        return;
-    }
+        if (users.length === 0) {
+            console.log('[BACKGROUND] Kullanıcı listesi boş.');
+            return;
+        }
 
-    // Find next user to check (round-robin)
-    // Sort by lastChecked (oldest first), then take the first one
-    const sortedUsers = [...users].sort((a, b) => {
-        const aTime = a.lastChecked ? new Date(a.lastChecked).getTime() : 0;
-        const bTime = b.lastChecked ? new Date(b.lastChecked).getTime() : 0;
-        return aTime - bTime;
-    });
+        // Find next user to check (round-robin)
+        const sortedUsers = [...users].sort((a, b) => {
+            const aTime = a.lastChecked ? new Date(a.lastChecked).getTime() : 0;
+            const bTime = b.lastChecked ? new Date(b.lastChecked).getTime() : 0;
+            return aTime - bTime;
+        });
 
-    const userToCheck = sortedUsers[0];
+        const userToCheck = sortedUsers[0];
 
-    console.log(`[BACKGROUND] Kontrol ediliyor: ${userToCheck.username}`);
+        console.log(`[BACKGROUND] Kontrol ediliyor: ${userToCheck.username}`);
 
-    const result = await checkInstagramUser(userToCheck.username);
+        const result = await checkInstagramUser(userToCheck.username);
 
-    const index = users.findIndex(u => u.username === userToCheck.username);
-    if (index !== -1) {
-        users[index].status = result.status;
-        users[index].lastChecked = new Date().toISOString();
-    }
+        const index = users.findIndex(u => u.username === userToCheck.username);
+        if (index !== -1) {
+            users[index].status = result.status;
+            users[index].lastChecked = new Date().toISOString();
+        }
 
-    console.log(`[BACKGROUND] ${userToCheck.username}: ${result.status} - ${result.description}`);
+        console.log(`[BACKGROUND] ${userToCheck.username}: ${result.status} - ${result.description}`);
 
-    saveUsers();
+        saveUsers();
 
-    // Alert if issue found
-    if ((result.status === 'BANLI' || result.status === 'KISITLI') && chatId) {
-        const alertMsg = `⚠️ UYARI!\n\n👤 ${userToCheck.username}\n🚫 Durum: ${result.status}\n\n📝 ${result.description}`;
-        bot.sendMessage(chatId, alertMsg);
+        // Alert if issue found
+        if ((result.status === 'BANLI' || result.status === 'KISITLI') && chatId) {
+            const alertMsg = `⚠️ UYARI!\n\n👤 ${userToCheck.username}\n🚫 Durum: ${result.status}\n\n📝 ${result.description}`;
+            bot.sendMessage(chatId, alertMsg).catch(err => console.error('[ALERT ERROR]', err));
+        }
+
+        console.log('[BACKGROUND] Kontrol tamamlandı.');
+
+    } catch (error) {
+        console.error('[BACKGROUND ERROR]', error);
+
+        // Send error notification to user
+        if (chatId) {
+            const errorMsg = `❌ ARKA PLAN HATASI\n\n🔧 Arka plan kontrolü sırasında hata oluştu.\n\n📝 Hata: ${error.message}\n\n⚠️ Telegram botu çalışmaya devam ediyor.\n30 dakika sonra tekrar denenecek.`;
+            bot.sendMessage(chatId, errorMsg).catch(err => console.error('[NOTIFICATION ERROR]', err));
+        }
     }
 }
 
 function sendReport(targetChatId = chatId) {
-    if (!users.length) return;
-    if (!targetChatId) return console.log('[REPORT] CHAT_ID tanımlı değil.');
+    try {
+        if (!users.length) return;
+        if (!targetChatId) return console.log('[REPORT] CHAT_ID tanımlı değil.');
 
-    const aktif = users.filter(u => u.status === 'AKTIF');
-    const banli = users.filter(u => u.status === 'BANLI');
-    const kisitli = users.filter(u => u.status === 'KISITLI');
-    const rateLimit = users.filter(u => u.status === 'RATE_LIMIT');
-    const bekleyen = users.filter(u => u.status === 'pending');
-    const hata = users.filter(u => u.status === 'HATA');
-    const belirsiz = users.filter(u => u.status === 'BELIRSIZ');
+        const aktif = users.filter(u => u.status === 'AKTIF');
+        const banli = users.filter(u => u.status === 'BANLI');
+        const kisitli = users.filter(u => u.status === 'KISITLI');
+        const rateLimit = users.filter(u => u.status === 'RATE_LIMIT');
+        const bekleyen = users.filter(u => u.status === 'pending');
+        const hata = users.filter(u => u.status === 'HATA');
+        const belirsiz = users.filter(u => u.status === 'BELIRSIZ');
 
-    let message = `╔═══════════════════════╗
+        let message = `╔═══════════════════════╗
 ║   📊 GÜNLÜK RAPOR 📊   ║
 ╚═══════════════════════╝\n\n`;
 
-    if (aktif.length) message += `✅ Aktif (${aktif.length}):\n${aktif.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-    if (banli.length) message += `🚫 Banlı/Silinmiş (${banli.length}):\n${banli.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-    if (kisitli.length) message += `⚠️ Kısıtlı (${kisitli.length}):\n${kisitli.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-    if (rateLimit.length) message += `⏸️ Rate Limit (${rateLimit.length}):\n${rateLimit.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-    if (belirsiz.length) message += `❔ Belirsiz (${belirsiz.length}):\n${belirsiz.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-    if (bekleyen.length) message += `⏳ Bekleyen (${bekleyen.length}):\n${bekleyen.map(u => `  • ${u.username}`).join('\n')}\n\n`;
-    if (hata.length) message += `❌ Hata (${hata.length}):\n${hata.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+        if (aktif.length) message += `✅ Aktif (${aktif.length}):\n${aktif.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+        if (banli.length) message += `🚫 Banlı/Silinmiş (${banli.length}):\n${banli.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+        if (kisitli.length) message += `⚠️ Kısıtlı (${kisitli.length}):\n${kisitli.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+        if (rateLimit.length) message += `⏸️ Rate Limit (${rateLimit.length}):\n${rateLimit.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+        if (belirsiz.length) message += `❔ Belirsiz (${belirsiz.length}):\n${belirsiz.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+        if (bekleyen.length) message += `⏳ Bekleyen (${bekleyen.length}):\n${bekleyen.map(u => `  • ${u.username}`).join('\n')}\n\n`;
+        if (hata.length) message += `❌ Hata (${hata.length}):\n${hata.map(u => `  • ${u.username}`).join('\n')}\n\n`;
 
-    message += `━━━━━━━━━━━━━━━━━━━━━\n� ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}\n👨‍💻 @codedbyelif`;
+        message += `━━━━━━━━━━━━━━━━━━━━━\n🕐 ${new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}\n👨‍💻 @codedbyelif`;
 
-    bot.sendMessage(targetChatId, message);
+        bot.sendMessage(targetChatId, message).catch(err => console.error('[REPORT ERROR]', err));
+
+    } catch (error) {
+        console.error('[REPORT GENERATION ERROR]', error);
+    }
 }
 
 // Start Schedulers
