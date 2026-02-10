@@ -46,10 +46,10 @@ function saveUsers() {
 
 // /start
 bot.onText(/\/start/, (msg) => {
-    const welcomeMsg = `🤖 *Instagram Kontrol Botu*
+    const welcomeMsg = `🤖 Instagram Kontrol Botu
 
 Komutlar:
-/adduser <username> <thread_url> - Kullanıcı ekle
+/adduser kullanıcı_adı thread_url - Kullanıcı ekle
 /listusers - Listeyi gör
 /checknow - Şimdi kontrol et
 /clearusers - Listeyi temizle
@@ -57,7 +57,7 @@ Komutlar:
 Örnek:
 /adduser riseinweb3 https://www.instagram.com/direct/t/123456/`;
 
-    bot.sendMessage(msg.chat.id, welcomeMsg, { parse_mode: 'Markdown' });
+    bot.sendMessage(msg.chat.id, welcomeMsg);
 });
 
 // /adduser <username> <url>
