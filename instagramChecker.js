@@ -10,7 +10,7 @@ const USER_AGENTS = [
 ];
 
 /**
- * Checks Instagram user profile
+ * Checks Instagram user profile with improved detection
  * @param {string} username - Instagram username to check
  * @returns {Promise<Object>} Check result with status and description
  */
@@ -33,12 +33,12 @@ async function checkInstagramUser(username) {
             validateStatus: (status) => status >= 200 && status < 500
         });
 
-        // Check HTTP status
+        // Check HTTP status (rare but still possible)
         if (response.status === 404) {
             return {
                 username,
                 status: 'BANLI',
-                description: 'Hesap bulunamadı veya silinmiş'
+                description: 'Hesap bulunamadı (404)'
             };
         }
 
@@ -46,7 +46,7 @@ async function checkInstagramUser(username) {
             return {
                 username,
                 status: 'KISITLI',
-                description: 'Hesap kısıtlanmış veya erişim engellendi'
+                description: 'Erişim engellendi (403)'
             };
         }
 
@@ -58,17 +58,41 @@ async function checkInstagramUser(username) {
             };
         }
 
-        // Parse HTML
+        // Parse HTML for deep analysis
         const html = response.data;
+        const $ = cheerio.load(html);
 
-        // Check for common error messages
+        // Get meta information
+        const title = $('title').text();
+        const ogTitle = $('meta[property="og:title"]').attr('content');
+        const ogDescription = $('meta[property="og:description"]').attr('content');
+
+        // Check if username appears in JSON data
+        const hasUsernameInJSON = html.includes(`"username":"${username}"`);
+
+        // Detection logic:
+        // Active account: Has username in title, has OG tags, has username in JSON
+        // Inactive/Deleted: Generic "Instagram" title, no OG tags, no username in JSON
+
+        const isGenericTitle = title.trim() === 'Instagram' || title.includes('Login');
+        const hasOGData = ogTitle && ogDescription;
+
+        if (isGenericTitle && !hasOGData && !hasUsernameInJSON) {
+            return {
+                username,
+                status: 'BANLI',
+                description: 'Hesap bulunamadı veya silinmiş'
+            };
+        }
+
+        // Check for explicit error messages
         if (html.includes("Sorry, this page isn't available") ||
             html.includes("Sayfa Bulunamadı") ||
             html.includes("Page Not Found")) {
             return {
                 username,
                 status: 'BANLI',
-                description: 'Hesap bulunamadı (soft 404)'
+                description: 'Sayfa mevcut değil'
             };
         }
 
@@ -81,11 +105,20 @@ async function checkInstagramUser(username) {
             };
         }
 
-        // If we got here with 200 and no error messages, account is active
+        // If we have username in JSON and proper meta tags, account is active
+        if (hasUsernameInJSON || hasOGData) {
+            return {
+                username,
+                status: 'AKTIF',
+                description: 'Hesap aktif ve erişilebilir'
+            };
+        }
+
+        // Fallback: If we can't determine, mark as uncertain
         return {
             username,
-            status: 'AKTIF',
-            description: 'Hesap aktif ve erişilebilir'
+            status: 'BELIRSIZ',
+            description: 'Durum belirlenemedi, manuel kontrol gerekebilir'
         };
 
     } catch (error) {
