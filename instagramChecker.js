@@ -13,9 +13,10 @@ const USER_AGENTS = [
  * Checks Instagram user profile with smart retry on rate limits
  * @param {string} username - Instagram username to check
  * @param {number} retryCount - Current retry attempt (for exponential backoff)
+ * @param {boolean} enableRetry - Whether to enable retry (default: true)
  * @returns {Promise<Object>} Check result with status and description
  */
-async function checkInstagramUser(username, retryCount = 0) {
+async function checkInstagramUser(username, retryCount = 0, enableRetry = true) {
     const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
     const profileUrl = `https://www.instagram.com/${username}/`;
 
@@ -50,18 +51,18 @@ async function checkInstagramUser(username, retryCount = 0) {
         }
 
         if (response.status === 403 || response.status === 429) {
-            // Rate limit detected - retry with exponential backoff
-            if (retryCount < 3) {
+            // Rate limit detected - retry with exponential backoff (only if enabled)
+            if (enableRetry && retryCount < 3) {
                 const waitTime = Math.pow(2, retryCount) * 60 * 1000; // 1min, 2min, 4min
                 console.log(`[RETRY] ${username} - Rate limit, waiting ${waitTime / 1000 / 60} minutes...`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
-                return checkInstagramUser(username, retryCount + 1);
+                return checkInstagramUser(username, retryCount + 1, enableRetry);
             }
 
             return {
                 username,
                 status: 'RATE_LIMIT',
-                description: `Rate limit - ${retryCount} deneme sonrası başarısız`,
+                description: enableRetry ? `Rate limit - ${retryCount} deneme sonrası başarısız` : 'Rate limit algılandı',
                 retryCount
             };
         }
@@ -85,20 +86,20 @@ async function checkInstagramUser(username, retryCount = 0) {
         const hasUsernameInJSON = html.includes(`"username":"${username}"`);
         const hasOGData = !!(ogTitle && ogDescription);
 
-        // If we got rate limited (generic Instagram page), retry
+        // If we got rate limited (generic Instagram page), retry (only if enabled)
         const isGenericTitle = title.trim() === 'Instagram' || title.includes('Login');
         if (isGenericTitle && !hasOGData && !hasUsernameInJSON) {
-            if (retryCount < 3) {
+            if (enableRetry && retryCount < 3) {
                 const waitTime = Math.pow(2, retryCount) * 60 * 1000;
                 console.log(`[RETRY] ${username} - Generic page, waiting ${waitTime / 1000 / 60} minutes...`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
-                return checkInstagramUser(username, retryCount + 1);
+                return checkInstagramUser(username, retryCount + 1, enableRetry);
             }
 
             return {
                 username,
                 status: 'RATE_LIMIT',
-                description: `Rate limit algılandı - ${retryCount} deneme sonrası`,
+                description: enableRetry ? `Rate limit algılandı - ${retryCount} deneme sonrası` : 'Rate limit algılandı',
                 retryCount
             };
         }
@@ -145,12 +146,12 @@ async function checkInstagramUser(username, retryCount = 0) {
 
     } catch (error) {
         if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
-            // Timeout - retry
-            if (retryCount < 3) {
+            // Timeout - retry (only if enabled)
+            if (enableRetry && retryCount < 3) {
                 const waitTime = Math.pow(2, retryCount) * 60 * 1000;
                 console.log(`[RETRY] ${username} - Timeout, waiting ${waitTime / 1000 / 60} minutes...`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
-                return checkInstagramUser(username, retryCount + 1);
+                return checkInstagramUser(username, retryCount + 1, enableRetry);
             }
 
             return {
