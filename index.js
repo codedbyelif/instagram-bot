@@ -128,8 +128,8 @@ bot.onText(/\/checknow/, async (msg) => {
             users[index].lastChecked = new Date().toISOString();
         }
 
-        // Wait 3 seconds between checks
-        await new Promise(r => setTimeout(r, 3000));
+        // Wait 5 seconds between checks (increased to avoid rate limiting)
+        await new Promise(r => setTimeout(r, 5000));
     }
 
     saveUsers();
@@ -172,8 +172,8 @@ async function runBackgroundBatch() {
 
         console.log(`[BATCH] ${user.username}: ${result.status}`);
 
-        // Wait 3 seconds
-        await new Promise(r => setTimeout(r, 3000));
+        // Wait 5 seconds (increased to avoid rate limiting)
+        await new Promise(r => setTimeout(r, 5000));
     }
 
     saveUsers();
@@ -197,14 +197,18 @@ function sendReport(targetChatId = chatId) {
     const aktif = users.filter(u => u.status === 'AKTIF');
     const banli = users.filter(u => u.status === 'BANLI');
     const kisitli = users.filter(u => u.status === 'KISITLI');
+    const rateLimit = users.filter(u => u.status === 'RATE_LIMIT');
     const bekleyen = users.filter(u => u.status === 'pending');
     const hata = users.filter(u => u.status === 'HATA');
+    const belirsiz = users.filter(u => u.status === 'BELIRSIZ');
 
     let message = `📊 Kontrol Raporu\n\n`;
 
     if (aktif.length) message += `✅ Aktif (${aktif.length}):\n${aktif.map(u => `- ${u.username}`).join('\n')}\n\n`;
     if (banli.length) message += `🚫 Banlı/Silinmiş (${banli.length}):\n${banli.map(u => `- ${u.username}`).join('\n')}\n\n`;
     if (kisitli.length) message += `⚠️ Kısıtlı (${kisitli.length}):\n${kisitli.map(u => `- ${u.username}`).join('\n')}\n\n`;
+    if (rateLimit.length) message += `⏸️ Rate Limit (${rateLimit.length}):\n${rateLimit.map(u => `- ${u.username}`).join('\n')}\n\n`;
+    if (belirsiz.length) message += `❔ Belirsiz (${belirsiz.length}):\n${belirsiz.map(u => `- ${u.username}`).join('\n')}\n\n`;
     if (bekleyen.length) message += `⏳ Bekleyen (${bekleyen.length}):\n${bekleyen.map(u => `- ${u.username}`).join('\n')}\n\n`;
     if (hata.length) message += `❓ Hata (${hata.length}):\n${hata.map(u => `- ${u.username}`).join('\n')}\n\n`;
 
