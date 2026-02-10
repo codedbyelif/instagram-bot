@@ -205,3 +205,214 @@ This project is open source and available under the [MIT License](LICENSE).
 ---
 
 Developed by [@codedbyelif](https://github.com/codedbyelif)
+
+---
+---
+
+# Instagram Hesap Izleme Botu (Turkce)
+
+> Gelistirici: [@codedbyelif](https://github.com/codedbyelif)
+
+Instagram hesaplarini izleyen ve durumlarini raporlayan bir Telegram botu. Hesaplarin aktif, banli, kisitli veya rate-limited olup olmadigini kontrol eder ve bildirimleri dogrudan Telegram sohbetinize gonderir.
+
+---
+
+## Ozellikler
+
+- **Anlik Hesap Kontrolu** - `/check` komutu ile herhangi bir Instagram hesabinin durumunu aninda kontrol edin. Sonuclar saniyeler icinde doner, bekleme yoktur.
+- **Otomatik Arka Plan Izleme** - Bot her 30 dakikada bir listenizdeki bir hesabi otomatik olarak kontrol eder. En uzun sure once kontrol edilen hesap secilir (round-robin yontemi).
+- **Akilli Yeniden Deneme** - Arka plan kontrolleri Instagram rate limit algılarsa otomatik olarak 3 kez yeniden dener. Bekleme sureleri artarak devam eder: 1 dk, 2 dk, 4 dk.
+- **Gercek Zamanli Bildirimler** - Her arka plan kontrolunden sonra Telegram mesaji alin, sadece sorun oldugunda degil.
+- **Gunluk Rapor** - Takip edilen tum hesaplarin durum ozeti her gun saat 21:00'de (Istanbul saati) gonderilir.
+- **Rate Limit Korumasi** - User-Agent rotasyonu, istek araliklari ve `/check` komutunda 5 dakikalik bekleme suresi ile Instagram rate limitini en aza indirir.
+- **Hata Dayanikliligi** - Arka plan kontrolu cokerse Telegram botu calismaya devam eder. Hatalar loglanir ve Telegram uzerinden bildirilir. Bot bir sonraki 30 dakikalik donguede otomatik olarak toparlanir.
+- **Bekleme Suresi Sistemi** - `/check` komutu, asiri istekleri onlemek icin kullanici basina 5 dakika bekleme suresi uygular.
+
+---
+
+## Durum Kodlari
+
+| Durum      | Anlami                                                      |
+|------------|-------------------------------------------------------------|
+| AKTIF      | Hesap aktif ve erisilebilir                                 |
+| BANLI      | Hesap banlanmis, silinmis veya bulunamadi (404)             |
+| KISITLI    | Hesap Instagram tarafindan kisitlanmis                      |
+| RATE_LIMIT | Instagram istekleri sinirliyor, durum belirsiz              |
+| BELIRSIZ   | Hesap durumu belirlenemedi                                  |
+| HATA       | Kontrol sirasinda bir hata olustu                           |
+
+---
+
+## Gereksinimler
+
+- Node.js (v16 veya ustu)
+- npm
+- Bir Telegram bot tokeni ([@BotFather](https://t.me/BotFather) uzerinden)
+- Telegram Sohbet ID'niz
+
+---
+
+## Kurulum
+
+### 1. Depoyu Klonlayin
+
+```bash
+git clone https://github.com/codedbyelif/instagram-bot.git
+cd instagram-bot
+```
+
+### 2. Bagimliliklari Yukleyin
+
+```bash
+npm install
+```
+
+### 3. Ortam Degiskenlerini Yapilandirin
+
+Proje dizinindeki `config.env` dosyasini duzenleyin:
+
+```
+TELEGRAM_BOT_TOKEN=bot_tokeniniz_buraya
+CHAT_ID=sohbet_id_niz_buraya
+CHECK_TIME=21:00
+```
+
+- **TELEGRAM_BOT_TOKEN**: Telegram'da [@BotFather](https://t.me/BotFather) uzerinden alin.
+- **CHAT_ID**: Telegram sohbet veya grup ID'niz. [@raw_data_bot](https://t.me/raw_data_bot) botuna mesaj atarak ogrenebilirsiniz. Gruplar icin ID `-100` ile baslar.
+- **CHECK_TIME**: Gunluk rapor saati, SS:DD formatinda (Istanbul saat dilimi). Varsayilan: `21:00`.
+
+### 4. Botu Calistirin
+
+**Gelistirme/test icin:**
+
+```bash
+node index.js
+```
+
+**Uretim/surekli calisma icin (onerilen):**
+
+```bash
+npm install -g pm2
+pm2 start index.js --name instagram-bot
+pm2 save
+pm2 startup
+```
+
+---
+
+## Komutlar
+
+| Komut                  | Aciklama                                          |
+|------------------------|---------------------------------------------------|
+| `/start`               | Karsilama mesajini ve komut listesini goster       |
+| `/adduser <kullanici>` | Takip listesine Instagram kullanici adi ekle       |
+| `/check <kullanici>`   | Hesabi aninda kontrol et (5 dk bekleme suresi)     |
+| `/listusers`           | Tum takip edilen kullanicilari ve durumlarini goster|
+| `/clearusers`          | Takip listesindeki tum kullanicilari kaldir        |
+
+---
+
+## Nasil Calisir
+
+### Hesap Algilama
+
+Bot `https://www.instagram.com/<kullanici_adi>/` adresine HTTP GET istegi gonderir ve yaniti analiz eder:
+
+1. **HTTP 404** - Hesap mevcut degil (BANLI).
+2. **HTTP 403/429** - Instagram rate limit uyguluyor (RATE_LIMIT).
+3. **HTML icinde OpenGraph verisi veya JSON'da kullanici adi var** - Hesap aktif (AKTIF).
+4. **HTML icinde "sayfa bulunamadi" mesaji var** - Hesap banli (BANLI).
+5. **HTML icinde "kisitlanmis profil" mesaji var** - Hesap kisitli (KISITLI).
+6. **Kullanici verisi olmayan genel Instagram sayfasi** - Rate limit algilandi (RATE_LIMIT).
+
+### Arka Plan Isleme
+
+- Bir cron gorevi her 30 dakikada bir calisir.
+- En uzun sure once kontrol edilen kullaniciyi secer (round-robin).
+- Instagram rate limit donerse, bot artan bekleme sureleriyle 3 kez yeniden dener (1, 2, 4 dakika).
+- Her kontrolden sonra Telegram sohbetinize bildirim gonderilir.
+- Arka plan islemi cokerse, bot hatayi loglar, size bildirim gonderir ve normal calismaya devam eder.
+
+### Anlik Kontrol ve Arka Plan Kontrolu Karsilastirmasi
+
+| Ozellik              | `/check` Komutu   | Arka Plan Kontrolu    |
+|----------------------|-------------------|-----------------------|
+| Basarisizlikta tekrar | Hayir (anlik)     | Evet (3 kez)          |
+| Bekleme suresi       | 5 dakika          | 30 dakika aralik      |
+| Bildirim             | Istekte bulunana  | CHAT_ID'ye            |
+| Tetikleme            | Manuel            | Otomatik (cron)       |
+
+---
+
+## Rate Limit Korumasi
+
+Instagram otomatik istekleri agresif bir sekilde sinirlar. Bot bunu en aza indirmek icin cesitli stratejiler kullanir:
+
+1. **User-Agent Rotasyonu** - 4 farkli tarayici user-agent dizesi arasinda donus yapar.
+2. **Istek Araliklari** - Arka plan kontrolleri 30 dakika arayla yapilir.
+3. **Bekleme Suresi** - `/check` komutu kullanici basina 5 dakikalik bekleme suresi uygular.
+4. **Gercekci Basliklar** - Istekler gercek bir tarayici oturumunu taklit eden basliklar icerir.
+5. **Artan Bekleme** - Rate limit durumunda 1, 2, ardindan 4 dakika bekler ve tekrar dener.
+
+Bu onlemlere ragmen, sunucunuzun IP itibarına ve izlenen hesap sayisina bagli olarak rate limiting yine de meydana gelebilir.
+
+---
+
+## Proje Yapisi
+
+```
+instagram-bot/
+├── index.js               # Ana bot mantigi, komutlar, arka plan kontrolcu
+├── instagramChecker.js     # Yeniden deneme mantikli Instagram profil kontrolcu
+├── scheduler.js            # Arka plan kontrolleri ve gunluk raporlar icin cron zamanlayici
+├── config.env              # Ortam degiskenleri (git tarafindan izlenmez)
+├── users.json              # Takip edilen kullanici verileri (git tarafindan izlenmez)
+├── package.json            # Node.js bagimliliklari
+├── .gitignore              # Git yoksayma kurallari
+└── README.md               # Bu dosya
+```
+
+---
+
+## PM2 Komutlari
+
+```bash
+pm2 start index.js --name instagram-bot   # Botu baslat
+pm2 restart instagram-bot                 # Botu yeniden baslat
+pm2 stop instagram-bot                    # Botu durdur
+pm2 logs instagram-bot --lines 50         # Son loglari goruntule
+pm2 status                                # Bot durumunu kontrol et
+pm2 delete instagram-bot                  # PM2'den kaldir
+```
+
+---
+
+## Sorun Giderme
+
+**Bot komutlara yanit vermiyor:**
+- Botun calisip calismadigini kontrol edin: `pm2 status`
+- `config.env` dosyasindaki bot tokenini dogrulayin
+- Hata icin loglari kontrol edin: `pm2 logs instagram-bot`
+
+**Arka plan bildirimleri gelmiyor:**
+- `config.env` dosyasinda `CHAT_ID` degerinin dogru ayarlandigindan emin olun
+- Grup sohbetleri icin CHAT_ID `-100` ile baslamalidir
+
+**Tum hesaplar RATE_LIMIT gosteriyor:**
+- Instagram IP'nizi engelliyor. 30-60 dakika bekleyin.
+- Manuel `/check` komutlarinin sayisini azaltin.
+- VPN veya proxy kullanmayi deneyin.
+
+**Bot surekli cokuyor ve yeniden basliyor:**
+- PM2 loglarini kontrol edin: `pm2 logs instagram-bot --err --lines 50`
+- Yaygin neden: gecersiz bot tokeni veya ag sorunlari.
+
+---
+
+## Lisans
+
+Bu proje acik kaynaklidir ve [MIT Lisansi](LICENSE) altinda kullanilabilir.
+
+---
+
+Gelistirici: [@codedbyelif](https://github.com/codedbyelif)
