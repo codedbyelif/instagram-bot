@@ -59,20 +59,27 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // /addusers
-let isAddingUsers = false;
+// Store user addition state per chat to support multiple users
+const userAdditionState = {};
+
+// /addusers
 bot.onText(/\/addusers/, (msg) => {
-    isAddingUsers = true;
+    userAdditionState[msg.chat.id] = true;
     bot.sendMessage(msg.chat.id, 'Lütfen eklenecek kullanıcı adlarını gönderin (her satıra bir tane).');
 });
 
 bot.on('message', (msg) => {
     if (!msg.text || msg.text.startsWith('/')) return;
 
-    if (isAddingUsers) {
+    // Check if this chat is in "adding users" mode
+    if (userAdditionState[msg.chat.id]) {
+        console.log(`[DEBUG] Adding users for chat ${msg.chat.id}: ${msg.text}`);
+
         const newNames = msg.text.split('\n').map(u => u.trim()).filter(u => u.length > 0);
         let addedCount = 0;
 
         newNames.forEach(username => {
+            // Check based on username property since users is an object array now
             if (!users.some(u => u.username === username)) {
                 users.push({ username, status: 'pending', lastChecked: null });
                 addedCount++;
@@ -80,7 +87,9 @@ bot.on('message', (msg) => {
         });
 
         saveUsers();
-        isAddingUsers = false;
+        // Reset state for this chat
+        delete userAdditionState[msg.chat.id];
+
         bot.sendMessage(msg.chat.id, `✅ ${addedCount} yeni kullanıcı eklendi. Toplam: ${users.length}`);
     }
 });
