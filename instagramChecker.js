@@ -1,86 +1,114 @@
 const axios = require('axios');
+const cheerio = require('cheerio');
 
-// Rotate User Agents to avoid detection
+// User-Agent rotation for stealth
 const USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
 ];
 
-async function checkUser(username, retries = 3) {
-    const url = `https://www.instagram.com/${username}/`;
+/**
+ * Checks Instagram user via direct thread URL
+ * @param {string} username - Expected username
+ * @param {string} directThreadUrl - Instagram direct thread URL
+ * @returns {Promise<Object>} Check result with status and description
+ */
+async function checkInstagramUser(username, directThreadUrl) {
+    const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
-    for (let i = 0; i < retries; i++) {
-        try {
-            // Pick a random User-Agent
-            const randomAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+    try {
+        const response = await axios.get(directThreadUrl, {
+            headers: {
+                'User-Agent': userAgent,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            },
+            timeout: 10000,
+            maxRedirects: 5,
+            validateStatus: (status) => status >= 200 && status < 500
+        });
 
-            const response = await axios.get(url, {
-                headers: {
-                    'User-Agent': randomAgent,
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language': 'en-US,en;q=0.5',
-                    'DNT': '1',
-                    'Connection': 'keep-alive',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'none',
-                    'Sec-Fetch-User': '?1',
-                    'Cache-Control': 'max-age=0',
-                },
-                maxRedirects: 5,
-                validateStatus: function (status) {
-                    return status >= 200 && status < 500;
-                }
-            });
-
-            // Status Code Analysis
-            if (response.status === 404) {
-                return { username, status: 'banned', code: 404 };
-            }
-
-            if (response.status === 200) {
-                // Content Analysis for Soft Bans / Errors
-                const html = response.data;
-
-                // Common Instagram error messages
-                if (html.includes("Sorry, this page isn't available") || html.includes("Sayfa Bulunamadı")) {
-                    return { username, status: 'banned', code: 404 }; // Soft 404
-                }
-
-                if (html.includes("Restricted profile") || html.includes("Kısıtlanmış profil")) {
-                    return { username, status: 'restricted', code: 200 };
-                }
-
-                if (html.includes("Login • Instagram")) {
-                    // Sometimes it redirects to login, which usually means the profile exists but is private or requires login.
-                    // We count this as active for now, but it could be ambiguous.
-                    return { username, status: 'active', code: 200 };
-                }
-
-                // If we got here, it likely loaded the profile page
-                return { username, status: 'active', code: 200 };
-            }
-
-            if (response.status === 302 || response.status === 403) {
-                return { username, status: 'restricted', code: response.status };
-            } else {
-                console.log(`[Deneme ${i + 1}] ${username} için beklenmedik durum kodu: ${response.status}`);
-            }
-
-        } catch (error) {
-            console.error(`[Deneme ${i + 1}] ${username} kontrol edilirken hata:`, error.message);
+        // Check HTTP status
+        if (response.status === 404 || response.status === 410) {
+            return {
+                username,
+                url: directThreadUrl,
+                status: 'URL_GECERSIZ',
+                description: 'Thread URL geçersiz veya silinmiş (404/410)'
+            };
         }
 
-        // Wait before retry
-        const delay = Math.floor(Math.random() * 3000) + 2000;
-        await new Promise(resolve => setTimeout(resolve, delay));
-    }
+        if (response.status === 403) {
+            return {
+                username,
+                url: directThreadUrl,
+                status: 'ERISIM_KISITLI',
+                description: 'Instagram tarafından erişim kısıtlandı'
+            };
+        }
 
-    return { username, status: 'error', code: null };
+        if (response.status !== 200) {
+            return {
+                username,
+                url: directThreadUrl,
+                status: 'URL_GECERSIZ',
+                description: `Beklenmeyen HTTP durumu: ${response.status}`
+            };
+        }
+
+        // Parse HTML and check for username
+        const html = response.data;
+        const finalUrl = response.request.res.responseUrl || directThreadUrl;
+
+        // Load HTML with cheerio
+        const $ = cheerio.load(html);
+        const pageTitle = $('title').text();
+        const bodyText = $('body').text();
+
+        // Check if username exists in various places
+        const usernameInUrl = finalUrl.toLowerCase().includes(username.toLowerCase());
+        const usernameInHtml = html.toLowerCase().includes(username.toLowerCase());
+        const usernameInTitle = pageTitle.toLowerCase().includes(username.toLowerCase());
+        const usernameInBody = bodyText.toLowerCase().includes(username.toLowerCase());
+
+        if (usernameInUrl || usernameInHtml || usernameInTitle || usernameInBody) {
+            return {
+                username,
+                url: directThreadUrl,
+                status: 'AKTIF',
+                description: 'Kullanıcı adı doğrulandı, hesap aktif'
+            };
+        } else {
+            return {
+                username,
+                url: directThreadUrl,
+                status: 'KULLANICI_ADI_DEGISMIS',
+                description: 'Kullanıcı adı bulunamadı, hesap kapatılmış veya kullanıcı adı değişmiş olabilir'
+            };
+        }
+
+    } catch (error) {
+        if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+            return {
+                username,
+                url: directThreadUrl,
+                status: 'ERISIM_KISITLI',
+                description: 'Bağlantı zaman aşımına uğradı'
+            };
+        }
+
+        return {
+            username,
+            url: directThreadUrl,
+            status: 'HATA',
+            description: `Kontrol hatası: ${error.message}`
+        };
+    }
 }
 
-module.exports = { checkUser };
+module.exports = { checkInstagramUser };
