@@ -73,7 +73,7 @@ bot.onText(/\/start/, (msg) => {
         '   \u2192 Listeyi temizle',
         '',
         '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501',
-        '\u2699\uFE0F Arka Plan: Her 30dk\'da 1 kullanici',
+        '\u2699\uFE0F Arka Plan: Her 2 saatte 1 kullanici',
         '\uD83D\uDCCA Gunluk Rapor: 21:00',
         '',
         '\uD83D\uDCA1 Ornek Kullanim:',
@@ -235,7 +235,7 @@ async function runBackgroundBatch() {
     } catch (error) {
         console.error('[BACKGROUND ERROR]', error);
         if (chatId) {
-            const errorMsg = '\u274C ARKA PLAN HATASI\n\n\uD83D\uDD27 Hata: ' + error.message + '\n\n\u26A0\uFE0F Bot calismaya devam ediyor.\n30 dakika sonra tekrar denenecek.';
+            const errorMsg = '\u274C ARKA PLAN HATASI\n\n\uD83D\uDD27 Hata: ' + error.message + '\n\n\u26A0\uFE0F Bot calismaya devam ediyor.\n2 saat sonra tekrar denenecek.';
             bot.sendMessage(chatId, errorMsg).catch(err => console.error('[NOTIFICATION ERROR]', err));
         }
     }
@@ -280,3 +280,26 @@ scheduleDistributedChecks(runBackgroundBatch);
 scheduleDailyReport(checkTime, sendReport);
 
 console.log('[BOT] Bot calisiyor... Gunluk rapor: ' + checkTime + ' (Turkiye saati)');
+
+// Startup notification + immediate first check
+(async () => {
+    const startTime = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
+
+    if (chatId) {
+        let startMsg = '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n';
+        startMsg += '\u2551  \u2705 BOT BASLATILDI \u2705   \u2551\n';
+        startMsg += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
+        startMsg += '\uD83D\uDD04 Arka plan kontrolleri: Her 2 saat\n';
+        startMsg += '\uD83D\uDCCA Gunluk rapor: ' + checkTime + '\n';
+        startMsg += '\uD83D\uDC64 Takip edilen: ' + users.length + ' kullanici\n\n';
+        startMsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
+        startMsg += '\uD83D\uDD50 ' + startTime + '\n';
+        startMsg += '\uD83D\uDC95 @codedbyelif';
+
+        await bot.sendMessage(chatId, startMsg).catch(err => console.error('[STARTUP NOTIFICATION ERROR]', err));
+    }
+
+    // Run first check immediately (don't wait 30 minutes)
+    console.log('[BOT] Ilk kontrol hemen baslatiliyor...');
+    await runBackgroundBatch();
+})();
