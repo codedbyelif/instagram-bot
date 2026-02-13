@@ -7,7 +7,7 @@ const { scheduleDistributedChecks, scheduleDailyReport } = require('./scheduler'
 
 // Configuration
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const chatId = process.env.CHAT_ID;
+const chatIds = (process.env.CHAT_ID || '').split(',').map(id => id.trim()).filter(Boolean);
 const checkTime = process.env.CHECK_TIME || '21:00';
 const usersFile = path.join(__dirname, 'users.json');
 
@@ -211,7 +211,7 @@ async function runBackgroundBatch() {
         saveUsers();
 
         // Notify for every check
-        if (chatId) {
+        if (chatIds.length > 0) {
             const statusEmoji = {
                 'AKTIF': '\u2705', 'BANLI': '\uD83D\uDEAB', 'KISITLI': '\u26A0\uFE0F',
                 'RATE_LIMIT': '\u23F8\uFE0F', 'HATA': '\u274C', 'BELIRSIZ': '\u2754'
@@ -228,23 +228,27 @@ async function runBackgroundBatch() {
             notifMsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
             notifMsg += '\uD83D\uDD50 ' + timeStr;
 
-            bot.sendMessage(chatId, notifMsg).catch(err => console.error('[NOTIFICATION ERROR]', err));
+            for (const id of chatIds) {
+                bot.sendMessage(id, notifMsg).catch(err => console.error(`[NOTIFICATION ERROR] (ChatID: ${id})`, err));
+            }
         }
 
         console.log('[BACKGROUND] Kontrol tamamlandi.');
     } catch (error) {
         console.error('[BACKGROUND ERROR]', error);
-        if (chatId) {
+        if (chatIds.length > 0) {
             const errorMsg = '\u274C ARKA PLAN HATASI\n\n\uD83D\uDD27 Hata: ' + error.message + '\n\n\u26A0\uFE0F Bot calismaya devam ediyor.\n2 saat sonra tekrar denenecek.';
-            bot.sendMessage(chatId, errorMsg).catch(err => console.error('[NOTIFICATION ERROR]', err));
+            for (const id of chatIds) {
+                bot.sendMessage(id, errorMsg).catch(err => console.error(`[NOTIFICATION ERROR] (ChatID: ${id})`, err));
+            }
         }
     }
 }
 
-function sendReport(targetChatId = chatId) {
+function sendReport() {
     try {
         if (!users.length) return;
-        if (!targetChatId) return console.log('[REPORT] CHAT_ID tanimli degil.');
+        if (chatIds.length === 0) return console.log('[REPORT] CHAT_ID tanimli degil.');
 
         const aktif = users.filter(u => u.status === 'AKTIF');
         const banli = users.filter(u => u.status === 'BANLI');
@@ -269,7 +273,9 @@ function sendReport(targetChatId = chatId) {
         const timeStr = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
         message += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\uD83D\uDD50 ' + timeStr + '\n\uD83D\uDC95 @codedbyelif';
 
-        bot.sendMessage(targetChatId, message).catch(err => console.error('[REPORT ERROR]', err));
+        for (const id of chatIds) {
+            bot.sendMessage(id, message).catch(err => console.error(`[REPORT ERROR] (ChatID: ${id})`, err));
+        }
     } catch (error) {
         console.error('[REPORT GENERATION ERROR]', error);
     }
@@ -286,7 +292,7 @@ console.log('[BOT] Session ID: ' + Date.now().toString().slice(-6));
 (async () => {
     const startTime = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
 
-    if (chatId) {
+    if (chatIds.length > 0) {
         let startMsg = '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n';
         startMsg += '\u2551  \u2705 BOT BASLATILDI \u2705   \u2551\n';
         startMsg += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
@@ -297,7 +303,9 @@ console.log('[BOT] Session ID: ' + Date.now().toString().slice(-6));
         startMsg += '\uD83D\uDD50 ' + startTime + '\n';
         startMsg += '\uD83D\uDC95 @codedbyelif';
 
-        await bot.sendMessage(chatId, startMsg).catch(err => console.error('[STARTUP NOTIFICATION ERROR]', err));
+        for (const id of chatIds) {
+            await bot.sendMessage(id, startMsg).catch(err => console.error(`[STARTUP NOTIFICATION ERROR] (ChatID: ${id})`, err));
+        }
     }
 
     // Run first check immediately (don't wait 30 minutes)
