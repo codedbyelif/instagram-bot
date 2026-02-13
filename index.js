@@ -290,7 +290,7 @@ console.log('[BOT] Session ID: ' + Date.now().toString().slice(-6));
         let startMsg = '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n';
         startMsg += '\u2551  \u2705 BOT BASLATILDI \u2705   \u2551\n';
         startMsg += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
-        startMsg += '\uD83D\uDD04 Arka plan kontrolleri: Her 2 saat\n';
+        startMsg += '\uD83D\uDD04 Arka plan kontrolleri: Her 30 dakikada bir\n';
         startMsg += '\uD83D\uDCCA Gunluk rapor: ' + checkTime + '\n';
         startMsg += '\uD83D\uDC64 Takip edilen: ' + users.length + ' kullanici\n\n';
         startMsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';

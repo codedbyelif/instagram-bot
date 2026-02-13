@@ -5,9 +5,9 @@ const cron = require('node-cron');
  * @param {function} checkCallback - The function to execute batch checks.
  */
 function scheduleDistributedChecks(checkCallback) {
-    // Run every 2 hours (to avoid Instagram rate limits)
-    cron.schedule('0 */2 * * *', () => {
-        console.log('Arka plan kontrolü çalıştırılıyor (Her 2 saatte bir)...');
+    // Run every 30 minutes
+    cron.schedule('*/30 * * * *', () => {
+        console.log('Arka plan kontrolü çalıştırılıyor (Her 30 dakikada bir)...');
         checkCallback();
     }, {
         scheduled: true,
