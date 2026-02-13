@@ -50,9 +50,19 @@ function saveUsers() {
     }
 }
 
+function checkAuth(msg) {
+    if (chatIds.length > 0 && !chatIds.includes(msg.chat.id.toString())) {
+        bot.sendMessage(msg.chat.id, '\u26D4 Yetkisiz Erisim: Bu bot ozeldir ve sadece izin verilen sohbetlerde calisir.');
+        console.log(`[AUTH FAIL] Chat ID: ${msg.chat.id} (User: ${msg.from.username || msg.from.first_name})`);
+        return false;
+    }
+    return true;
+}
+
 // --- Bot Commands ---
 
 bot.onText(/\/start/, (msg) => {
+    if (!checkAuth(msg)) return;
     const lines = [
         '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557',
         '\u2551  \uD83D\uDC96 INSTAGRAM BOT \uD83D\uDC96  \u2551',
@@ -87,6 +97,7 @@ bot.onText(/\/start/, (msg) => {
 });
 
 bot.onText(/\/adduser (.+)/, (msg, match) => {
+    if (!checkAuth(msg)) return;
     const username = match[1].trim();
     if (!username) {
         return bot.sendMessage(msg.chat.id, '\u274C Kullanim: /adduser kullanici_adi');
@@ -100,6 +111,7 @@ bot.onText(/\/adduser (.+)/, (msg, match) => {
 });
 
 bot.onText(/\/listusers/, (msg) => {
+    if (!checkAuth(msg)) return;
     if (users.length === 0) {
         return bot.sendMessage(msg.chat.id, '\uD83D\uDCED Liste bos.');
     }
@@ -119,6 +131,7 @@ bot.onText(/\/listusers/, (msg) => {
 });
 
 bot.onText(/\/clearusers/, (msg) => {
+    if (!checkAuth(msg)) return;
     users = [];
     saveUsers();
     bot.sendMessage(msg.chat.id, '\uD83D\uDDD1\uFE0F Liste temizlendi.');
@@ -126,6 +139,7 @@ bot.onText(/\/clearusers/, (msg) => {
 
 // /check <username> - Instant single user check (NO RETRY - instant result)
 bot.onText(/\/check (.+)/, async (msg, match) => {
+    if (!checkAuth(msg)) return;
     const username = match[1].trim();
     const userId = msg.from.id;
     if (!username) {
@@ -176,6 +190,7 @@ bot.onText(/\/check (.+)/, async (msg, match) => {
 });
 
 bot.onText(/\/checknow/, (msg) => {
+    if (!checkAuth(msg)) return;
     bot.sendMessage(msg.chat.id, '\u26A0\uFE0F Bu komut artik kullanilmiyor.\n\nAnlik kontrol icin: /check kullanici_adi\nOrnek: /check instagram');
 });
 
@@ -287,6 +302,7 @@ scheduleDailyReport(checkTime, sendReport);
 
 console.log('[BOT] Bot calisiyor... Gunluk rapor: ' + checkTime + ' (Turkiye saati)');
 console.log('[BOT] Session ID: ' + Date.now().toString().slice(-6));
+console.log('[BOT] Izin verilen Chat IDleri:', chatIds);
 
 // Startup notification + immediate first check
 (async () => {
