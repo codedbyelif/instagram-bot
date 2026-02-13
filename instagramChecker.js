@@ -161,24 +161,6 @@ async function checkInstagramUser(username, retryCount = 0, enableRetry = true) 
         const hasUsernameInJSON = html.includes(`"username":"${username}"`);
         const hasOGData = !!(ogTitle && ogDescription);
 
-        // If we got rate limited (generic Instagram page), retry (only if enabled)
-        const isGenericTitle = title.trim() === 'Instagram' || title.includes('Login');
-        if (isGenericTitle && !hasOGData && !hasUsernameInJSON) {
-            if (enableRetry && retryCount < 3) {
-                const waitTime = Math.pow(2, retryCount) * 60 * 1000;
-                console.log(`[RETRY] ${username} - Generic page, waiting ${waitTime / 1000 / 60} minutes...`);
-                await new Promise(resolve => setTimeout(resolve, waitTime));
-                return checkInstagramUser(username, retryCount + 1, enableRetry);
-            }
-
-            return {
-                username,
-                status: 'RATE_LIMIT',
-                description: enableRetry ? `Rate limit algılandı - ${retryCount} deneme sonrası` : 'Rate limit algılandı',
-                retryCount
-            };
-        }
-
         // POSITIVE INDICATORS: Active account
         if (hasOGData || hasUsernameInJSON) {
             return {
@@ -189,10 +171,14 @@ async function checkInstagramUser(username, retryCount = 0, enableRetry = true) 
             };
         }
 
-        // NEGATIVE INDICATORS: Explicit error messages
+        // NEGATIVE INDICATORS: Explicit error messages (Check this BEFORE generic rate limit)
         if (html.includes("Sorry, this page isn't available") ||
             html.includes("Sayfa Bulunamadı") ||
-            html.includes("Page Not Found")) {
+            html.includes("Page Not Found") ||
+            html.includes("broken link") ||
+            html.includes("Go back to Instagram") ||
+            title.includes("Page Not Found") ||
+            title.includes("Sayfa Bulunamadı")) {
             return {
                 username,
                 status: 'BANLI',
@@ -207,6 +193,39 @@ async function checkInstagramUser(username, retryCount = 0, enableRetry = true) 
                 username,
                 status: 'KISITLI',
                 description: 'Profil kısıtlanmış',
+                retryCount
+            };
+        }
+
+        // If we got rate limited (generic Instagram page), retry (only if enabled)
+        // This check is now AFTER the explicit 404/Ban checks
+        const isGenericTitle = title.trim() === 'Instagram' || title.includes('Login');
+        if (isGenericTitle && !hasOGData && !hasUsernameInJSON) {
+            // Check if we were redirected to login page
+            const finalUrl = response.request.res ? response.request.res.responseUrl : '';
+            const isLoginRedirect = finalUrl.includes('/accounts/login/');
+
+            if (isLoginRedirect) {
+                if (enableRetry && retryCount < 3) {
+                    const waitTime = Math.pow(2, retryCount) * 60 * 1000;
+                    console.log(`[RETRY] ${username} - Login redirect, waiting ${waitTime / 1000 / 60} minutes...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    return checkInstagramUser(username, retryCount + 1, enableRetry);
+                }
+                return {
+                    username,
+                    status: 'RATE_LIMIT',
+                    description: enableRetry ? `Login Redirect - ${retryCount} deneme sonrası` : 'Login Redirect',
+                    retryCount
+                };
+            }
+
+            // If NOT redirected to login, but has generic title -> Likely a 404 (Soft 404)
+            // Instagram serves a 200 OK generic page for non-existent users to bots
+            return {
+                username,
+                status: 'BANLI',
+                description: 'Hesap bulunamadı (Soft 404)',
                 retryCount
             };
         }

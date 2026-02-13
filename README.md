@@ -196,6 +196,10 @@ pm2 delete instagram-bot                  # Remove from PM2
 - Check PM2 logs: `pm2 logs instagram-bot --err --lines 50`
 - Common cause: invalid bot token or network issues.
 
+**409 Conflict Error:**
+- You are trying to run the bot on multiple devices (PC + Laptop) with the same token.
+- Solution: Stop the other instance or create a new bot token.
+
 ---
 
 ## License
@@ -406,6 +410,10 @@ pm2 delete instagram-bot                  # PM2'den kaldir
 **Bot surekli cokuyor ve yeniden basliyor:**
 - PM2 loglarini kontrol edin: `pm2 logs instagram-bot --err --lines 50`
 - Yaygin neden: gecersiz bot tokeni veya ag sorunlari.
+
+**409 Conflict Hatasi:**
+- Ayni bot tokeni ile birden fazla cihazda (PC + Laptop) calismaya calisiyorsunuz.
+- Cozum: Diger cihazi kapatin veya yeni bir bot tokeni kullanin.
 
 ---
 

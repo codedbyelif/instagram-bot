@@ -280,6 +280,7 @@ scheduleDistributedChecks(runBackgroundBatch);
 scheduleDailyReport(checkTime, sendReport);
 
 console.log('[BOT] Bot calisiyor... Gunluk rapor: ' + checkTime + ' (Turkiye saati)');
+console.log('[BOT] Session ID: ' + Date.now().toString().slice(-6));
 
 // Startup notification + immediate first check
 (async () => {
