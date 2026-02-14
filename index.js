@@ -10,6 +10,7 @@ const token = process.env.TELEGRAM_BOT_TOKEN;
 const chatIds = (process.env.CHAT_ID || '').split(',').map(id => id.trim()).filter(Boolean);
 const checkTime = process.env.CHECK_TIME || '21:00';
 const usersFile = path.join(__dirname, 'users.json');
+const logFile = path.join(__dirname, 'activity.log');
 
 if (!token) {
     console.error('Hata: TELEGRAM_BOT_TOKEN config.env dosyasinda tanimlanmamis.');
@@ -43,10 +44,22 @@ try {
 
 function saveUsers() {
     try {
-        fs.writeFileSync(usersFile, JSON.stringify(users, null, 2), 'utf8');
-        console.log('[SAVE] ' + users.length + ' kullanici kaydedildi.');
+        const tempFile = usersFile + '.tmp';
+        fs.writeFileSync(tempFile, JSON.stringify(users, null, 2), 'utf8');
+        fs.renameSync(tempFile, usersFile);
+        console.log('[SAVE] ' + users.length + ' kullanici guvenle kaydedildi.');
     } catch (err) {
-        console.error('users.json kaydedilirken hata:', err);
+        console.error('users.json kaydedilirken kritik hata:', err);
+    }
+}
+
+function logActivity(message) {
+    try {
+        const timestamp = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
+        const logLine = `[${timestamp}] ${message}\n`;
+        fs.appendFileSync(logFile, logLine, 'utf8');
+    } catch (err) {
+        console.error('Log yazilirken hata:', err);
     }
 }
 
@@ -107,7 +120,7 @@ bot.onText(/\/adduser (.+)/, (msg, match) => {
     }
     users.push({ username, status: 'pending', lastChecked: null });
     saveUsers();
-    bot.sendMessage(msg.chat.id, '\u2705 Eklendi!\n\n\uD83D\uDC64 Kullanici: ' + username + '\n\uD83D\uDCCA Toplam: ' + users.length + ' kullanici');
+    bot.sendMessage(msg.chat.id, '\u2705 Eklendi!\n\n\uD83D\uDC64 Kullanici: ' + username + '\n\uD83D\uDD17 Link: https://www.instagram.com/' + username + '/\n\uD83D\uDCCA Toplam: ' + users.length + ' kullanici');
 });
 
 bot.onText(/\/listusers/, (msg) => {
@@ -181,6 +194,7 @@ bot.onText(/\/check (.+)/, async (msg, match) => {
     resultMsg += '\u2551     \uD83D\uDCCA KONTROL SONUCU     \u2551\n';
     resultMsg += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
     resultMsg += '\uD83D\uDC64 Kullanici: ' + username + '\n';
+    resultMsg += '\uD83D\uDD17 Link: https://www.instagram.com/' + username + '/\n';
     resultMsg += emoji + ' Durum: ' + result.status + '\n\n';
     resultMsg += '\uD83D\uDCDD Aciklama:\n' + result.description + '\n\n';
     resultMsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
@@ -223,6 +237,7 @@ async function runBackgroundBatch() {
         }
 
         console.log('[BACKGROUND] ' + userToCheck.username + ': ' + result.status + ' - ' + result.description);
+        logActivity(`${userToCheck.username} kontrol edildi. Durum: ${result.status} (${result.description})`);
         saveUsers();
 
         // Notify for every check
@@ -238,6 +253,7 @@ async function runBackgroundBatch() {
             notifMsg += '\u2551  \uD83D\uDD04 ARKA PLAN KONTROL  \u2551\n';
             notifMsg += '\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D\n\n';
             notifMsg += '\uD83D\uDC64 Kullanici: ' + userToCheck.username + '\n';
+            notifMsg += '\uD83D\uDD17 Link: https://www.instagram.com/' + userToCheck.username + '/\n';
             notifMsg += emoji + ' Durum: ' + result.status + '\n\n';
             notifMsg += '\uD83D\uDCDD ' + result.description + '\n\n';
             notifMsg += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
@@ -303,6 +319,7 @@ scheduleDailyReport(checkTime, sendReport);
 console.log('[BOT] Bot calisiyor... Gunluk rapor: ' + checkTime + ' (Turkiye saati)');
 console.log('[BOT] Session ID: ' + Date.now().toString().slice(-6));
 console.log('[BOT] Izin verilen Chat IDleri:', chatIds);
+console.log('[BOT] Users Dosyasi:', usersFile);
 
 // Startup notification + immediate first check
 (async () => {
