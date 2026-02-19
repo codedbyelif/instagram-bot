@@ -58,7 +58,13 @@ npm install
 
 ### 3. Configure Environment Variables
 
-Edit the `config.env` file in the project root:
+Copy the example config file and fill in your values:
+
+```bash
+cp config.env.example config.env
+```
+
+Then edit `config.env`:
 
 ```
 TELEGRAM_BOT_TOKEN=your_bot_token_here
@@ -273,7 +279,13 @@ npm install
 
 ### 3. Ortam Degiskenlerini Yapilandirin
 
-Proje dizinindeki `config.env` dosyasini duzenleyin:
+Ornek config dosyasini kopyalayip degerlerinizi girin:
+
+```bash
+cp config.env.example config.env
+```
+
+Ardindan `config.env` dosyasini duzenleyin:
 
 ```
 TELEGRAM_BOT_TOKEN=bot_tokeniniz_buraya
